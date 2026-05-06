@@ -28,6 +28,10 @@ tpColor   = input.color(color.green, "Take Profit Line Color", group="Style Tab 
 tpWidth   = input.int(3, "Take Profit Line Thickness", minval=1, maxval=10, group="Style Tab Settings")
 tpStyleIn = input.string("Solid", "Take Profit Line Format", options=["Solid", "Dashed", "Dotted"], group="Style Tab Settings")
 
+// Structural Vertical Unit Line Customizer
+unitColor   = input.color(color.white, "Vertical Unit Line Color", group="Style Tab Settings")
+unitStyleIn = input.string("Dashed", "Vertical Unit Line Format", options=["Solid", "Dashed", "Dotted"], group="Style Tab Settings")
+
 // --- Map String Dropdowns to Core Line Style Constants ---
 getLineStyle(styleString) =>
     switch styleString
@@ -36,8 +40,9 @@ getLineStyle(styleString) =>
         "Dotted" => line.style_dotted
         => line.style_solid
 
-slStyle = getLineStyle(slStyleIn)
-tpStyle = getLineStyle(tpStyleIn)
+slStyle   = getLineStyle(slStyleIn)
+tpStyle   = getLineStyle(tpStyleIn)
+unitStyle = getLineStyle(unitStyleIn)
 
 // --- Constants for Initial Unconfirmed State ---
 color orangeOutline = color.new(color.orange, 30)
@@ -69,6 +74,10 @@ var line[] demandSLLines = array.new_line()
 var line[] supplySLLines = array.new_line()
 var line[] demandTPLines = array.new_line()
 var line[] supplyTPLines = array.new_line()
+
+// --- New Tracking Arrays for Vertical Unit Component Connectors ---
+var line[] demandUnitLines = array.new_line()
+var line[] supplyUnitLines = array.new_line()
 
 // --- Persistent Variables to Track Historic Zone Indices ---
 var int lastDemandBar = na
@@ -117,11 +126,13 @@ if not na(potentialDemandBaseBar) and bar_index > potentialDemandBaseBar
 
 if isDemandTrigger and not checkOverlap(demandBoxes, potentialDemandBaseHigh, potentialDemandBaseLow)
     int currentBaseBar = potentialDemandBaseBar
-    box newBox = box.new(currentBaseBar, potentialDemandBaseHigh, bar_index + offset, potentialDemandBaseLow, bgcolor=bullColor, border_color=orangeOutline)
+    
+    // Changing box border styling to clear out the left border line completely
+    box newBox = box.new(currentBaseBar, potentialDemandBaseHigh, bar_index + offset, potentialDemandBaseLow, bgcolor=bullColor, border_color=color.new(orangeOutline, 100), border_style=line.style_none)
     array.push(demandBoxes, newBox)
     array.push(demandCreationBar, bar_index)
     array.push(demandTradeLabels, na)
-    array.push(demandState, 0) 
+    array.push(demandState, 0)
     array.push(demandTouched, false)
     array.push(demandMinLow, high)
     
@@ -157,6 +168,14 @@ if isDemandTrigger and not checkOverlap(demandBoxes, potentialDemandBaseHigh, po
     line tpLine = line.new(x1=currentBaseBar, y1=demandTPPrice, x2=currentBaseBar + 5, y2=demandTPPrice, color=useTP ? tpColor : color.new(tpColor, 100), width=tpWidth, style=tpStyle)
     array.push(demandTPLines, tpLine)
     
+    // Draw the vertical connector unit line linking SL, the box edge, and TP (thin width = 1)
+    line unitLine = line.new(x1=currentBaseBar, y1=demandSLPrice, x2=currentBaseBar, y2=demandTPPrice, color=unitColor, width=1, style=unitStyle)
+    array.push(demandUnitLines, unitLine)
+
+    // Manual borders to simulate a box missing its left side wall explicitly
+    line.new(x1=currentBaseBar, y1=potentialDemandBaseHigh, x2=bar_index + offset, y2=potentialDemandBaseHigh, color=orangeOutline, width=1, style=line.style_solid)
+    line.new(x1=currentBaseBar, y1=potentialDemandBaseLow, x2=bar_index + offset, y2=potentialDemandBaseLow, color=orangeOutline, width=1, style=line.style_solid)
+    
     lastDemandBar := currentBaseBar
     potentialDemandBaseBar := na
 
@@ -167,11 +186,13 @@ if not na(potentialSupplyBaseBar) and bar_index > potentialSupplyBaseBar
 
 if isSupplyTrigger and not checkOverlap(supplyBoxes, potentialSupplyBaseHigh, potentialSupplyBaseLow)
     int currentBaseBar = potentialSupplyBaseBar
-    box newBox = box.new(currentBaseBar, potentialSupplyBaseHigh, bar_index + offset, potentialSupplyBaseLow, bgcolor=bearColor, border_color=orangeOutline)
+    
+    // Changing box border styling to clear out the left border line completely
+    box newBox = box.new(currentBaseBar, potentialSupplyBaseHigh, bar_index + offset, potentialSupplyBaseLow, bgcolor=bearColor, border_color=color.new(orangeOutline, 100), border_style=line.style_none)
     array.push(supplyBoxes, newBox)
     array.push(supplyCreationBar, bar_index)
     array.push(supplyTradeLabels, na)
-    array.push(supplyState, 0) 
+    array.push(supplyState, 0)
     array.push(supplyTouched, false)
     array.push(supplyMaxHigh, low)
     
@@ -207,6 +228,14 @@ if isSupplyTrigger and not checkOverlap(supplyBoxes, potentialSupplyBaseHigh, po
     line tpLine = line.new(x1=currentBaseBar, y1=supplyTPPrice, x2=currentBaseBar + 5, y2=supplyTPPrice, color=useTP ? tpColor : color.new(tpColor, 100), width=tpWidth, style=tpStyle)
     array.push(supplyTPLines, tpLine)
     
+    // Draw the vertical connector unit line linking SL, the box edge, and TP (thin width = 1)
+    line unitLine = line.new(x1=currentBaseBar, y1=supplySLPrice, x2=currentBaseBar, y2=supplyTPPrice, color=unitColor, width=1, style=unitStyle)
+    array.push(supplyUnitLines, unitLine)
+
+    // Manual borders to simulate a box missing its left side wall explicitly
+    line.new(x1=currentBaseBar, y1=potentialSupplyBaseHigh, x2=bar_index + offset, y2=potentialSupplyBaseHigh, color=orangeOutline, width=1, style=line.style_solid)
+    line.new(x1=currentBaseBar, y1=potentialSupplyBaseLow, x2=bar_index + offset, y2=potentialSupplyBaseLow, color=orangeOutline, width=1, style=line.style_solid)
+    
     lastSupplyBar := currentBaseBar
     potentialSupplyBaseBar := na
 
@@ -223,6 +252,7 @@ if array.size(demandBoxes) > 0
         label tLbl = array.get(demandTradeLabels, i)
         line slL = array.get(demandSLLines, i)
         line tpL = array.get(demandTPLines, i)
+        line uL  = array.get(demandUnitLines, i)
         bool dTouched = array.get(demandTouched, i)
         float mLow = array.get(demandMinLow, i)
         int currentState = array.get(demandState, i)
@@ -252,12 +282,14 @@ if array.size(demandBoxes) > 0
                 label.delete(tLbl)
             line.delete(slL)
             line.delete(tpL)
+            line.delete(uL)
             array.remove(demandBoxes, i), array.remove(demandCreationBar, i), array.remove(demandTradeLabels, i), array.remove(demandSLLines, i), array.remove(demandTouched, i), array.remove(demandMinLow, i)
             array.remove(demandTPLines, i), array.remove(demandState, i)
+            array.remove(demandUnitLines, i)
         else
             if currentState == 2 and bar_index > cBar + 1 and dTouched
                 if (close > open) and (close > bTop) and (close[1] > bBot)
-                    array.set(demandState, i, 3) 
+                    array.set(demandState, i, 3)
                     alertBuy := true
                     
                     float sl = line.get_y1(slL)
@@ -285,6 +317,7 @@ if array.size(supplyBoxes) > 0
         label tLbl = array.get(supplyTradeLabels, i)
         line slL = array.get(supplySLLines, i)
         line tpL = array.get(supplyTPLines, i)
+        line uL  = array.get(supplyUnitLines, i)
         bool sTouched = array.get(supplyTouched, i)
         float mHigh = array.get(supplyMaxHigh, i)
         int currentState = array.get(supplyState, i)
@@ -314,12 +347,14 @@ if array.size(supplyBoxes) > 0
                 label.delete(tLbl)
             line.delete(slL)
             line.delete(tpL)
+            line.delete(uL)
             array.remove(supplyBoxes, i), array.remove(supplyCreationBar, i), array.remove(supplyTradeLabels, i), array.remove(supplySLLines, i), array.remove(supplyTouched, i), array.remove(supplyMaxHigh, i)
             array.remove(supplyTPLines, i), array.remove(supplyState, i)
+            array.remove(supplyUnitLines, i)
         else
             if currentState == 2 and bar_index > cBar + 1 and sTouched
                 if (close < open) and (close < bBot) and (close[1] < bTop)
-                    array.set(supplyState, i, 3) 
+                    array.set(supplyState, i, 3)
                     alertSell := true
                     
                     float sl = line.get_y1(slL)
