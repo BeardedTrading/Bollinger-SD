@@ -1,12 +1,12 @@
 # Bearded Trading Supply/Demand Engine (v6)
 
-An advanced, state-gated institutional supply and demand trading strategy written in Pine Script v6 for TradingView. This engine uses a multi-layered integer state machine to identify high-probability zone retests while remaining entirely immune to trend-expansion noise, consolidation spam, and visual desynchronization artifacts.
+An advanced, state-gated institutional supply and demand trading strategy written in Pine Script v6 for TradingView. This engine uses a sequential integer state machine to identify high-probability zone retests while remaining entirely immune to trend-expansion noise, consolidation spam, and visual desynchronization artifacts.
 
 ---
 
 ## Technical Architecture Overview
 
-Unlike basic binary indicators (Active / Dead), this engine maps supply and demand structures using a synchronized parallel array matrix paired with a **4-Stage Gating Detachment Matrix**. This architectural framework ensures that trades are only signaled when price action cleanly breaks away from a zone and returns on a validated pullback.
+Unlike basic binary indicators (Active / Dead), this engine structures its parallel matrix data array around a four-part progression. A zone cannot trade simply because price sits inside it; it must systematically transition through each gate by satisfying precise structural candlestick conditions.
 
 [State 0: Freshly Born] ──► (Price Detaches Cleanly) ──► [State 1: Armed & Ready]
 │
@@ -16,65 +16,108 @@ Unlike basic binary indicators (Active / Dead), this engine maps supply and dema
 
 ---
 
-## Structural Engine Rules
+## The Gated Lifecycle Specifications
 
-### 1. Zone Creation Mechanics (The Base-and-Breakout Engine)
-Zones are dynamically initialized using a two-phase structural candle relationship:
-* **Base Candle Identification:** * **Demand Candidate:** Any bearish candle close (`close < open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
-  * **Supply Candidate:** Any bullish candle close (`close > open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
-* **Breakout Trigger Evaluation:** A cached base candle candidate is converted into an active zone box when a subsequent candle breaks outside the base extremes:
-  * **Demand Zone Confirmation:** Triggered when a subsequent candle's high breaks strictly above the base high (`high > potentialDemandBaseHigh`).
-  * **Supply Zone Confirmation:** Triggered when a subsequent candle's low breaks strictly below the base low (`low < potentialSupplyBaseLow`).
-* **Overlap Prevention Filter:** Before array storage, the proposed zone must clear the `checkOverlap()` layout grid scan. If the coordinates fall completely within the boundaries of an already existing active box, it is classified as a duplicate transaction and discarded instantly to preserve chart clarity.
+### 📊 State 0: Freshly Born (Zone Discovery & Initialization)
 
-### 2. Risk Management Visuals (Static Anchor Lines)
-To preserve visual performance and eliminate tracking lag, stop loss and take profit targets are rendered **exactly once** at the zone’s birth:
-* **Stop Loss Line Placement:** Fixed at zone birth extending exactly 5 bars from origin.
-  * **Demand SL:** Projected below the box bottom floor line ($bBot - \text{tickBuffer}$).
-  * **Supply SL:** Projected above the box top ceiling line ($bTop + \text{tickBuffer}$).
-  * **Adaptive Protection (`useDynamicSL`):** When enabled, the engine automatically scans historical structural swing pivots back to the previous zone origin to snap protection lines beyond major market extremes.
-* **Take Profit Line Placement:** Calculated dynamically based on the configuration of your target inputs (`tpBuffer`).
-* *Note: These visual line paths are never stretched, dragged, or duplicated by loops. They act as constant, unchangeable boundaries for order execution references.*
+Every zone begins its existence in State 0. It serves as an unconfirmed structure and is strictly forbidden from evaluating entries or firing signals.
 
-### 3. Multi-Retest State Matrix
-To allow infinite independent retests without creating overlapping execution markers or double-trigger loops, the zone cycle maps through four distinct integer states:
-* **State 0: Freshly Born (Locked):** Zone is dormant. It cannot trade. This blocks breakout follow-through bars from triggering false multi-signals during momentum expansions.
-* **State 1: Detached & Armed:** Armed when price explicitly breaks away and separates from the zone bounds. 
-  * **Demand Reset:** `close > bTop` or `low > bTop`
-  * **Supply Reset:** `close < bBot` or `high < bBot`
-* **State 2: Pullback Touch Detected:** True retest condition met when a candle wick successfully penetrates the active zone coordinates (`low <= bTop` and `high >= bBot`).
-* **State 3: Signal Fired & Frozen:** Triggered when a confirmed reversal candle body closes inside or emerging out of State 2 (`close > open` for longs, `close < open` for shorts). The zone instantly locks into State 3 to freeze out consecutive consolidation ticks. It will refuse to fire again until price completely leaves the level, resetting the sequence back to **State 1**.
+#### A. Zone Discovery & Filtering Rules
+* **Base Candle Identification:** * **Demand Base Candidate:** Any bearish candle close (`close < open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
+  * **Supply Base Candidate:** Any bullish candle close (`close > open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
+* **Breakout Confirmation:** A candidate transitions from a cached state to an official active zone box when a subsequent candle aggressively breaches the base extremes:
+  * **Demand Zone:** A candle high breaks strictly above base high (`high > potentialDemandBaseHigh`).
+  * **Supply Zone:** A candle low breaks strictly below base low (`low < potentialSupplyBaseLow`).
+* **The Overlap Prevention Filter:** Before structural allocation, the new zone is processed through the `checkOverlap()` layout grid scan. If the top and bottom coordinates fall completely within the boundaries of an already existing active box in the array matrix, it is classified as a duplicate transaction and discarded instantly to preserve chart clarity.
 
-### 4. Zone Invalidation & Garbage Collection
-Active zones are evaluated on every bar close. A zone is permanently deleted if it encounters:
-* **A Hard Breach:** A candle body explicitly closes beyond the structural zone wall (`close < bBot` for Demand; `close > bTop` for Supply).
-* **A Proximity Breach:** The current market price drifts past the boundaries defined by `proximityPct`.
-
-When triggered, a complete array garbage collection cycle occurs synchronously:
-
-IF (Close cuts through Floor/Ceiling) OR (Price Drifts Outside Proximity Limits)
-└──► 1. Wipe Graphic Box Object from Chart Memory
-└──► 2. Wipe Graphic SL/TP Line Anchors from Chart Memory
-└──► 3. Erase Associated BUY/SELL Signal Label Pointers
-└──► 4. Cleanly Splice and Column-Shift Core Matrix Arrays
+#### B. Risk Management Instantiation
+The moment the breakout occurs and the box is born, risk management metrics are generated **exactly once**:
+* **Stop Loss Line Placement:** Rendered as a fixed 5-bar line anchor from the origin bar.
+  * **Demand SL:** Placed below the box floor line ($bBot - \text{tickBuffer}$).
+  * **Supply SL:** Placed above the box top ceiling line ($bTop + \text{tickBuffer}$).
+  * **Adaptive Protection (`useDynamicSL`):** The engine automatically scans the historical swing landscape back to the previous zone origin to snap protection paths beyond key structural swing pivots.
+* **Take Profit Line Placement:** Calculated dynamically based on the configuration of target inputs (`tpBuffer`).
+* *Note: These visual line paths are never stretched, dragged, or duplicated by loops. They act as constant boundaries for order execution references.*
 
 ---
 
-## Alert Dispatch Routing System
+### 🛡️ State 1: Detached & Armed (The Anti-Spam Shield)
+
+A zone enters State 1 when price action explicitly breaks away and separates from the zone coordinates. This acts as a protective shield ensuring the engine ignores follow-through momentum bars on the initial breakout trend expansion run.
+
+#### A. Transition Prerequisites
+* **Demand Zone Arming:** The zone switches from State 0 (or resets from State 3) to State 1 only when a candle close or a candle low prints completely above the zone top line (`close > bTop` or `low > bTop`).
+* **Supply Zone Arming:** The zone switches from State 0 (or resets from State 3) to State 1 only when a candle close or a candle high prints completely below the zone bottom line (`close < bBot` or `high < bBot`).
+* **Engine Status:** The zone is now "Armed and Ready". It begins monitoring live price feeds for pullback vectors.
+
+---
+
+### 🏹 State 2: Touch Detected (Retest Validation & Pullback Tracking)
+
+State 2 is achieved when the market experiences a true counter-trend pullback, bringing price action back down or up into the active historical boundaries.
+
+#### A. RETEST Criteria Rules
+* **Demand Retest Boundary:** While in State 1, a candle wick successfully penetrates the active zone boundaries (`low <= bTop` and `high >= bBot`).
+* **Supply Retest Boundary:** While in State 1, a candle wick successfully penetrates the active zone boundaries (`high >= bBot` and `low <= bTop`).
+* **Visual Status:** The `demandTouched` / `supplyTouched` internal array indices flip to `true`.
+
+---
+
+### 🔒 State 3: Fired & Locked (Signal Generation & Gating Lockout)
+
+State 3 represents trade confirmation and immediate risk isolation. 
+
+#### A. Opportunity Reversal Requirements
+While the zone is held in State 2, the engine looks for a structural candle body reversal on the bar close:
+* **BUY Signal Formula:** The current candle must close green (`close > open`), its closing price must be above the zone top (`close > bTop`), and the prior bar's close must have successfully held above the zone floor (`close[1] > bBot`).
+* **SELL Signal Formula:** The current candle must close red (`close < open`), its closing price must be below the zone bottom (`close < bBot`), and the prior bar's close must have successfully held below the zone ceiling (`close[1] < bTop`).
+
+#### B. Execution & Graphic Output
+Upon matching the formula, the strategy dispatches instructions instantly on the bar close:
+* **Broker Execution:** Executes a `strategy.entry()` long or short order, using the static y-positions of the original anchor lines (`line.get_y1()`) to calculate the exact risk distribution.
+* **Signal Marker Mapping:** Prints a clean blue **BUY** triangle or red **SELL** inverted triangle at the execution bar index.
+* **Consolidated Label Overwrite Gating:** To prevent stacking overlapping markers during tight retest consolidation, the script maintains precisely **one** active trade label slot pointer per array index. When a new retest occurs, the engine deletes the *previous* visual triangle marker on the chart interface (`if not na(tLbl) label.delete(tLbl)`) and replaces it with the newest signal.
+
+#### C. The Infinite Retest Loop Reset
+After a signal fires, the zone switches directly to State 3. **It becomes completely inactive.** This freezes out consecutive consolidation bars while price sits inside the box. It will refuse to fire again until price completely leaves the level, resetting the sequence back to **State 1**.
+
+---
+
+## 🛑 Global State Exceptions: Zone Invalidation & Garbage Collection
+
+Active zones are evaluated on every bar close across all states. If a zone violates hard baseline parameters, it is bypassed by the state machine and subjected to an immediate **Dynamic Garbage Collection Routine**.
+
+### Invalidation Triggers
+* **Raw Boundary Breach (Hard Breach):** A candle body explicitly closes beyond the defensive wall line (`close < bBot` for Demand; `close > bTop` for Supply).
+* **Proximity Limit Breach:** The current market price drifts too far away from the zone boundaries, exceeding the threshold defined by the `proximityPct` parameter.
+
+### The Cleanup Sequence
+When an invalidation trigger is met, all parallel entries sitting at loop column index position `i` are synchronously deleted to maintain a 1:1 data matrix alignment:
+
+[Invalidation Event]
+│
+├──► 1. box.delete(b) ───────► Wipes Graphic Box Object from Chart View
+├──► 2. line.delete(slL) ────► Removes Stop Loss Anchor from Memory
+├──► 3. line.delete(tpL) ────► Removes Take Profit Anchor from Memory
+├──► 4. label.delete(tLbl) ──► Retroactive Historical Purge of Signals
+└──► 5. array.remove() ──────► Slices and shifts core data matrix index columns
+
+---
+
+## 🔔 Alert Dispatch Framework
 
 Alert notifications are evaluated and processed strictly on the close of each candle bar using the `alert.freq_once_per_bar_close` parameter.
 
 ### System Alert Discrepancy Matrix
-A common technical discrepancy in advanced algorithmic scripts occurs when an alert is fired, but no signal marker appears on the chart interface. This behavior is intentional within this framework and is driven by two design mechanics:
+A common technical discrepancy occurs when an execution alert fires to an external webhook/terminal, but no signal arrow appears on the chart interface. This behavior is intentional within this architecture and is driven by the **Retroactive Historical Purge**:
 
-1. **The Retroactive Historical Purge:** If a long-term zone catches a valid retest, it immediately dispatches an execution alert to your webhooks or terminal and prints a visual triangle marker. However, if price continues to slide against that setup on subsequent bars, forcing a hard invalidation close, the garbage collection routine immediately triggers. It deletes the box, the lines, and **wipes that triangle marker from chart history**. Your terminal correctly received the alert while the zone was structurally alive, but the chart interface cleaned itself up retrospectively when the zone ultimately failed.
-2. **Consolidated Label Overwrite Gating:** To prevent your interface from stacking multiple overlapping triangle labels during tight retest cycles, the script maintains precisely **one** active trade label slot pointer per array index. When a subsequent valid retest occurs, the engine fires a new alert notification but runs a memory sweep (`if not na(tLbl) label.delete(tLbl)`), replacing the older visual marker with the newest signal. You will receive multiple real-time alerts over time, but the chart interface will keep itself visually optimized by displaying only the most recent retest vector.
+* If a zone catches a valid retest, it dispatches an execution alert to your webhooks and prints a visual triangle marker. 
+* However, if price continues to slide against that setup on subsequent bars, forcing a hard invalidation close, the garbage collection routine immediately triggers. It deletes the box, the lines, and **wipes that triangle marker from chart history**. 
+* Your terminal correctly received the alert while the zone was structurally alive, but the chart interface cleaned itself up retrospectively when the zone ultimately failed.
 
 ---
 
-## Core Matrix Arrays
-
-Data integrity is handled across a multi-array column grid tracker. When an index position modifications occurs, it is applied simultaneously down the column row list to maintain strict 1:1 row alignment:
+## Core Matrix Arrays Reference
 
 | Array Variable Name | Data Type Stored | Functional Application |
 | :--- | :--- | :--- |
