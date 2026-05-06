@@ -1,28 +1,32 @@
 //@version=6
 strategy("Bearded Trading Supply/Demand", overlay=true, max_boxes_count=500, initial_capital=10000)
 
-// --- Inputs (Inputs Tab) ---
-useDynamicSL = input.bool(false, "Use Dynamic Stop Loss (Adaptive Window)")
-tickBuffer   = input.int(2, "Stop Loss Placement Outside Zone/Swing (Ticks)")
-proximityPct = input.float(5.0, "Active Price Proximity %")
-offset       = input.int(100, "Zone Forward Extension (Bars)")
-rrRatio      = input.float(2.0, "Fallback Risk:Reward (Back Testing)")
-useTP        = input.bool(true, "Draw Manual Take Profit Line")
-tpBuffer     = input.int(10, "Take Profit Placement Inside/Beyond Zone (Ticks)")
+// ==========================================
+// --- INPUTS TAB CONFIGURATIONS ---
+// ==========================================
+useDynamicSL = input.bool(false, "Use Dynamic Stop Loss (Adaptive Window)", group="Core Strategy Inputs")
+tickBuffer   = input.int(2, "Stop Loss Placement Outside Zone/Swing (Ticks)", group="Core Strategy Inputs")
+proximityPct = input.float(5.0, "Active Price Proximity %", group="Core Strategy Inputs")
+offset       = input.int(100, "Zone Forward Extension (Bars)", group="Core Strategy Inputs")
+rrRatio      = input.float(2.0, "Fallback Risk:Reward (Back Testing)", group="Core Strategy Inputs")
+useTP        = input.bool(true, "Draw Manual Take Profit Line", group="Core Strategy Inputs")
+tpBuffer     = input.int(10, "Take Profit Placement Inside/Beyond Zone (Ticks)", group="Core Strategy Inputs")
 
-// --- Style Configurations (Relocated to Style Tab via display.settings) ---
-bullColor = input.color(color.new(color.green, 85), "Demand Zone Background Color", display = display.settings)
-bearColor = input.color(color.new(color.red, 85), "Supply Zone Background Color", display = display.settings)
+// ==========================================
+// --- STYLE TAB GROUP CONFIGURATIONS ---
+// ==========================================
+bullColor = input.color(color.new(color.green, 85), "Demand Zone Background Color", group="Style Tab Settings")
+bearColor = input.color(color.new(color.red, 85), "Supply Zone Background Color", group="Style Tab Settings")
 
 // Stop Loss Line Customizer
-slColor   = input.color(color.red, "Stop Loss Line Color", display = display.settings)
-slWidth   = input.int(3, "Stop Loss Line Thickness", minval=1, maxval=10, display = display.settings)
-slStyleIn = input.string("Solid", "Stop Loss Line Format", options=["Solid", "Dashed", "Dotted"], display = display.settings)
+slColor   = input.color(color.red, "Stop Loss Line Color", group="Style Tab Settings")
+slWidth   = input.int(3, "Stop Loss Line Thickness", minval=1, maxval=10, group="Style Tab Settings")
+slStyleIn = input.string("Solid", "Stop Loss Line Format", options=["Solid", "Dashed", "Dotted"], group="Style Tab Settings")
 
 // Take Profit Line Customizer
-tpColor   = input.color(color.green, "Take Profit Line Color", display = display.settings)
-tpWidth   = input.int(3, "Take Profit Line Thickness", minval=1, maxval=10, display = display.settings)
-tpStyleIn = input.string("Solid", "Take Profit Line Format", options=["Solid", "Dashed", "Dotted"], display = display.settings)
+tpColor   = input.color(color.green, "Take Profit Line Color", group="Style Tab Settings")
+tpWidth   = input.int(3, "Take Profit Line Thickness", minval=1, maxval=10, group="Style Tab Settings")
+tpStyleIn = input.string("Solid", "Take Profit Line Format", options=["Solid", "Dashed", "Dotted"], group="Style Tab Settings")
 
 // --- Map String Dropdowns to Core Line Style Constants ---
 getLineStyle(styleString) =>
