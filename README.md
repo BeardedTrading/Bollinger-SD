@@ -24,21 +24,21 @@ Every zone begins its existence in State 0. It serves as an unconfirmed structur
 
 #### A. Zone Discovery & Filtering Rules
 * **Base Candle Identification:** * **Demand Base Candidate:** Any bearish candle close (`close < open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
-  * **Supply Base Candidate:** Any bullish candle close (`close > open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
+    * **Supply Base Candidate:** Any bullish candle close (`close > open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
 * **Breakout Confirmation:** A candidate transitions from a cached state to an official active zone box when a subsequent candle aggressively breaches the base extremes:
-  * **Demand Zone:** A candle high breaks strictly above base high (`high > potentialDemandBaseHigh`).
-  * **Supply Zone:** A candle low breaks strictly below base low (`low < potentialSupplyBaseLow`).
+    * **Demand Zone:** A candle high breaks strictly above base high (`high > potentialDemandBaseHigh`).
+    * **Supply Zone:** A candle low breaks strictly below base low (`low < potentialSupplyBaseLow`).
 * **The Overlap Prevention Filter:** Before structural allocation, the new zone is processed through the `checkOverlap()` layout grid scan. If the top and bottom coordinates fall completely within the boundaries of an already existing active box in the array matrix, it is classified as a duplicate transaction and discarded instantly to preserve chart clarity.
 
 #### B. Risk Management & Visual Unit
 Upon breakout confirmation, risk management metrics and a visual unit connector are generated:
 * **Stop Loss Line Placement:** Rendered as a fixed 5-bar line anchor.
-  * **Demand SL:** Placed below the box floor line ($bBot - \text{tickBuffer}$).
-  * **Supply SL:** Placed above the box top ceiling line ($bTop + \text{tickBuffer}$).
-  * **Adaptive Protection (`useDynamicSL`):** The engine automatically scans the historical swing landscape back to the previous zone origin to snap protection paths beyond key structural swing pivots.
+    * **Demand SL:** Placed below the box floor line ($bBot - \text{tickBuffer}$).
+    * **Supply SL:** Placed above the box top ceiling line ($bTop + \text{tickBuffer}$).
+    * **Adaptive Protection (`useDynamicSL`):** The engine automatically scans the historical swing landscape back to the previous zone origin to snap protection paths beyond key structural swing pivots.
 * **Take Profit Line Placement:**
-  * **Adaptive Target (`useDynamicTP`):** The engine scans a cluster of candles around zone creation to identify structural extremes (highest high for demand, lowest low for supply) and anchors the `tpBuffer` beyond that pivot.
-  * **Static Target:** If dynamic TP is unchecked, it uses the manual `tpBuffer` value (default 60 ticks) relative to the zone boundaries.
+    * **Adaptive Target (`useDynamicTP`):** The engine scans a cluster of candles around zone creation to identify structural extremes (highest high for demand, lowest low for supply) and anchors the `tpBuffer` beyond that pivot.
+    * **Static Target:** If dynamic TP is unchecked, it uses the manual `tpBuffer` value (default 60 ticks) relative to the zone boundaries.
 * **Vertical Unit Connector:** A dashed line connects the SL price, the zone's left edge, and the TP price, unifying the setup as a single visual execution block.
 
 ---
@@ -48,8 +48,8 @@ Upon breakout confirmation, risk management metrics and a visual unit connector 
 A zone enters State 1 when price action explicitly breaks away and separates from the zone coordinates. This acts as a protective shield ensuring the engine ignores follow-through momentum bars on the initial breakout trend expansion run.
 
 #### A. Transition Prerequisites
-* **Demand Zone Arming:** The zone switches from State 0 (or resets from State 3) to State 1 only when a candle close or a candle low prints completely above the zone top line (`close > bTop` or `low > bTop`).
-* **Supply Zone Arming:** The zone switches from State 0 (or resets from State 3) to State 1 only when a candle close or a candle high prints completely below the zone bottom line (`close < bBot` or `high < bBot`).
+* **Demand Zone Arming:** The zone switches to State 1 only when a candle close or a candle low prints completely above the zone top line (`close > bTop` or `low > bTop`).
+* **Supply Zone Arming:** The zone switches to State 1 only when a candle close or a candle high prints completely below the zone bottom line (`close < bBot` or `high < bBot`).
 * **Engine Status:** The zone is now "Armed and Ready". It begins monitoring live price feeds for pullback vectors.
 
 ---
@@ -71,15 +71,15 @@ State 3 represents trade confirmation and immediate risk isolation. Upon a confi
 
 | Signal Tier | Requirements | Visual Style |
 | :--- | :--- | :--- |
-| **A++ (Elite)** | (BB Touch **AND** EMA Close Distance met) **AND** No Opposing Band Touch | Solid Vivid Hue |
-| **A+ (Premium)** | EMA Slope agrees with Direction **AND** (BB Touch **OR** EMA Close met) **AND** No Opposing Band Touch | Intermediate Shade |
+| **A++ (Elite)** | Trend Agreement **AND** Correct Side of EMA **AND** BB Touch | Solid Vivid Hue |
+| **A+ (Premium)** | Trend Agreement **AND** (Correct Side of EMA **OR** BB Touch) | Intermediate Shade |
 | **Standard** | Core Retest Engine fired; premium criteria not met or Opposing Band touched | Lighter Shade |
 
 #### A. Confluence Filters & Exclusion Rules
 * **BB Lookback Window:** Scans a custom historical window (`bbLookback`) prior to the signal for volatility exhaustion (touches/pierces of the bands).
-* **EMA Basis Threshold:** Requires the signal candle to close a specific distance (adjustable points via `emaThreshold`) above or below the 20-period EMA basis line to qualify for premium ratings.
-* **EMA Slope Alignment:** For **A+** ratings, the slope of the EMA basis line must agree with the trade direction (sloping up for BUY, sloping down for SELL).
-* **Opposing Band Exclusion:** Even if all other criteria are met, any setup that has touched the **opposing** Bollinger Band within the lookback window is disqualified from premium ratings (A+/A++) and relegated to a standard signal to avoid buying/selling into over-extension.
+* **EMA Trend Alignment:** For premium ratings, the slope of the EMA basis line must agree with the trade direction (sloping up for BUY, sloping down for SELL).
+* **Price Positioning:** Checks if the closing price is on the "correct" side of the EMA (above for BUY, below for SELL).
+* **Opposing Band Exclusion:** Even if other criteria are met, any setup that has touched the **opposing** Bollinger Band within the lookback window is disqualified from premium ratings (A+/A++) and relegated to a standard signal to avoid trading into over-extension.
 
 #### B. Execution & Graphic Output
 * **Broker Execution:** Executes a `strategy.entry()` order using the static y-positions of the original anchor lines (`line.get_y1()`) to calculate risk distribution.

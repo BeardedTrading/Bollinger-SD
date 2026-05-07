@@ -20,7 +20,6 @@ bbLength     = input.int(20, "BB Basis Length", minval=1, group="📊 Bollinger 
 bbSource     = input.source(close, "BB Source", group="📊 Bollinger Bands Engine")
 bbType       = input.string("EMA", "BB Basis Type", options=["SMA", "EMA"], group="📊 Bollinger Bands Engine")
 bbStdDev     = input.float(2.0, "BB Standard Deviation", minval=0.001, step=0.1, group="📊 Bollinger Bands Engine")
-emaThreshold = input.float(1.5, "EMA Minimum Close Distance (Points)", minval=0.0, step=0.5, group="📊 Bollinger Bands Engine")
 
 // ==========================================
 // --- SECTION 3: GRAPHIC & STYLE SETTINGS ---
@@ -304,6 +303,7 @@ if array.size(demandBoxes) > 0
                     strategy.entry("Long", strategy.long), strategy.exit("X Long", "Long", stop=line.get_y1(slL), limit=line.get_y1(tpL))
                     box.set_border_color(b, color.new(color.green, 40)), box.set_border_width(b, 1)
                     
+                    // --- REFINED CONFLUENCE LOGIC ---
                     bool lowerBBTouched = false
                     bool upperBBTouched_Exclusion = false
                     if useBB
@@ -313,19 +313,19 @@ if array.size(demandBoxes) > 0
                             if high[j] >= upperBand[j]
                                 upperBBTouched_Exclusion := true
                     
-                    bool closeAboveEma = useBB and ((close - bbBasis) >= emaThreshold)
-                    bool emaSlopeUp   = useBB and (bbBasis > bbBasis[1])
+                    bool priceAboveEma = useBB and (close > bbBasis)
+                    bool emaSlopeUp    = useBB and (bbBasis > bbBasis[1])
                     
                     string labelString = "BUY"
                     color  labelColor  = #a0c4ff 
                     
                     if useBB and not upperBBTouched_Exclusion
-                        if lowerBBTouched and closeAboveEma
-                            labelString := "BUY A++"
-                            labelColor := #0052cc 
-                        else if emaSlopeUp and (lowerBBTouched or closeAboveEma)
-                            labelString := "BUY A+"
-                            labelColor := #3a86ff 
+                        // A++: Trend Agreement AND Price position AND BB Touch
+                        if emaSlopeUp and priceAboveEma and lowerBBTouched
+                            labelString := "BUY A++", labelColor := #0052cc 
+                        // A+: Trend Agreement AND (Price position OR BB Touch)
+                        else if emaSlopeUp and (priceAboveEma or lowerBBTouched)
+                            labelString := "BUY A+", labelColor := #3a86ff 
                     
                     label signalLabel = label.new(bar_index, low, text=labelString, style=label.style_triangleup, color=labelColor, textcolor=labelColor, size=size.small, yloc=yloc.belowbar, text_formatting=text.format_bold)
                     if not na(tLbl)
@@ -379,19 +379,19 @@ if array.size(supplyBoxes) > 0
                             if low[j] <= lowerBand[j]
                                 lowerBBTouched_Exclusion := true
                     
-                    bool closeBelowEma = useBB and ((bbBasis - close) >= emaThreshold)
+                    bool priceBelowEma = useBB and (close < bbBasis)
                     bool emaSlopeDown  = useBB and (bbBasis < bbBasis[1])
                     
                     string labelString = "SELL"
                     color  labelColor  = #ffb7b2 
                     
                     if useBB and not lowerBBTouched_Exclusion
-                        if upperBBTouched and closeBelowEma
-                            labelString := "SELL A++"
-                            labelColor := #9b0000 
-                        else if emaSlopeDown and (upperBBTouched or closeBelowEma)
-                            labelString := "SELL A+"
-                            labelColor := #ff3333 
+                        // A++: Trend Agreement AND Price position AND BB Touch
+                        if emaSlopeDown and priceBelowEma and upperBBTouched
+                            labelString := "SELL A++", labelColor := #9b0000 
+                        // A+: Trend Agreement AND (Price position OR BB Touch)
+                        else if emaSlopeDown and (priceBelowEma or upperBBTouched)
+                            labelString := "SELL A+", labelColor := #ff3333 
                     
                     label signalLabel = label.new(bar_index, high, text=labelString, style=label.style_triangledown, color=labelColor, textcolor=labelColor, size=size.small, yloc=yloc.abovebar, text_formatting=text.format_bold)
                     if not na(tLbl)
