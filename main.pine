@@ -37,10 +37,6 @@ tpColor   = input.color(color.green, "Take Profit Line Color", group="🎨 Graph
 tpWidth   = input.int(3, "Take Profit Line Thickness", minval=1, maxval=10, group="🎨 Graphic & Style Customizers")
 tpStyleIn = input.string("Solid", "Take Profit Line Format", options=["Solid", "Dashed", "Dotted"], group="🎨 Graphic & Style Customizers")
 
-// Structural Vertical Unit Connector Customizer
-unitColor   = input.color(color.white, "Vertical Unit Line Color", group="🎨 Graphic & Style Customizers")
-unitStyleIn = input.string("Dashed", "Vertical Unit Line Format", options=["Solid", "Dashed", "Dotted"], group="🎨 Graphic & Style Customizers")
-
 // Bollinger Bands Plots Customizer
 bbBasisColor = input.color(color.gray, "BB Basis Line Color", group="🎨 Graphic & Style Customizers")
 bbBasisWidth = input.int(1, "BB Basis Line Thickness", minval=1, maxval=10, group="🎨 Graphic & Style Customizers")
@@ -57,7 +53,6 @@ getLineStyle(styleString) =>
 
 slStyle   = getLineStyle(slStyleIn)
 tpStyle   = getLineStyle(tpStyleIn)
-unitStyle = getLineStyle(unitStyleIn)
 
 // ==========================================
 // --- BOLLINGER BANDS ENGINE CALCULATIONS ---
@@ -106,10 +101,6 @@ var line[] demandSLLines = array.new_line()
 var line[] supplySLLines = array.new_line()
 var line[] demandTPLines = array.new_line()
 var line[] supplyTPLines = array.new_line()
-
-// --- Tracking Arrays for Vertical Unit Component Connectors ---
-var line[] demandUnitLines = array.new_line()
-var line[] supplyUnitLines = array.new_line()
 
 var int lastDemandBar = na
 var int lastSupplyBar = na
@@ -199,8 +190,6 @@ if isDemandTrigger and not checkOverlap(demandBoxes, potentialDemandBaseHigh, po
                 
     line tpLine = line.new(x1=currentBaseBar, y1=demandTPPrice, x2=currentBaseBar + 5, y2=demandTPPrice, color=tpColor, width=tpWidth, style=tpStyle)
     array.push(demandTPLines, tpLine)
-    line unitLine = line.new(x1=currentBaseBar, y1=demandSLPrice, x2=currentBaseBar, y2=demandTPPrice, color=unitColor, width=1, style=unitStyle)
-    array.push(demandUnitLines, unitLine)
     lastDemandBar := currentBaseBar
     potentialDemandBaseBar := na
 
@@ -258,8 +247,6 @@ if isSupplyTrigger and not checkOverlap(supplyBoxes, potentialSupplyBaseHigh, po
                 
     line tpLine = line.new(x1=currentBaseBar, y1=supplyTPPrice, x2=currentBaseBar + 5, y2=supplyTPPrice, color=tpColor, width=tpWidth, style=tpStyle)
     array.push(supplyTPLines, tpLine)
-    line unitLine = line.new(x1=currentBaseBar, y1=supplySLPrice, x2=currentBaseBar, y2=supplyTPPrice, color=unitColor, width=1, style=unitStyle)
-    array.push(supplyUnitLines, unitLine)
     lastSupplyBar := currentBaseBar
     potentialSupplyBaseBar := na
 
@@ -273,7 +260,7 @@ if array.size(demandBoxes) > 0
         float bTop = box.get_top(b), float bBot = box.get_bottom(b)
         int cBar = array.get(demandCreationBar, i)
         label tLbl = array.get(demandTradeLabels, i)
-        line slL = array.get(demandSLLines, i), line tpL = array.get(demandTPLines, i), line uL = array.get(demandUnitLines, i)
+        line slL = array.get(demandSLLines, i), line tpL = array.get(demandTPLines, i)
         bool dTouched = array.get(demandTouched, i), float mLow = array.get(demandMinLow, i), int currentState = array.get(demandState, i)
         
         if bar_index > cBar + 1
@@ -293,10 +280,12 @@ if array.size(demandBoxes) > 0
             box.delete(b)
             if not na(tLbl)
                 label.delete(tLbl)
-            line.delete(slL), line.delete(tpL), line.delete(uL)
-            array.remove(demandBoxes, i), array.remove(demandCreationBar, i), array.remove(demandTradeLabels, i), array.remove(demandSLLines, i), array.remove(demandTouched, i), array.remove(demandMinLow, i), array.remove(demandTPLines, i), array.remove(demandState, i), array.remove(demandUnitLines, i)
+            line.delete(slL), line.delete(tpL)
+            array.remove(demandBoxes, i), array.remove(demandCreationBar, i), array.remove(demandTradeLabels, i), array.remove(demandSLLines, i), array.remove(demandTouched, i), array.remove(demandMinLow, i), array.remove(demandTPLines, i), array.remove(demandState, i)
         else
+            // UPDATED: CONFIRMED CANDLE SIGNAL LOGIC
             if currentState == 2 and bar_index > cBar + 1 and dTouched
+                // Check for confirmed bullish reversal on candle close
                 if (close > open) and (close > bTop) and (close[1] > bBot)
                     array.set(demandState, i, 3)
                     alertBuy := true
@@ -340,7 +329,7 @@ if array.size(supplyBoxes) > 0
         float bTop = box.get_top(b), float bBot = box.get_bottom(b)
         int cBar = array.get(supplyCreationBar, i)
         label tLbl = array.get(supplyTradeLabels, i)
-        line slL = array.get(supplySLLines, i), line tpL = array.get(supplyTPLines, i), line uL = array.get(supplyUnitLines, i)
+        line slL = array.get(supplySLLines, i), line tpL = array.get(supplyTPLines, i)
         bool sTouched = array.get(supplyTouched, i), float mHigh = array.get(supplyMaxHigh, i), int currentState = array.get(supplyState, i)
         
         if bar_index > cBar + 1
@@ -360,10 +349,12 @@ if array.size(supplyBoxes) > 0
             box.delete(b)
             if not na(tLbl)
                 label.delete(tLbl)
-            line.delete(slL), line.delete(tpL), line.delete(uL)
-            array.remove(supplyBoxes, i), array.remove(supplyCreationBar, i), array.remove(supplyTradeLabels, i), array.remove(supplySLLines, i), array.remove(supplyTouched, i), array.remove(supplyMaxHigh, i), array.remove(supplyTPLines, i), array.remove(supplyState, i), array.remove(supplyUnitLines, i)
+            line.delete(slL), line.delete(tpL)
+            array.remove(supplyBoxes, i), array.remove(supplyCreationBar, i), array.remove(supplyTradeLabels, i), array.remove(supplySLLines, i), array.remove(supplyTouched, i), array.remove(supplyMaxHigh, i), array.remove(supplyTPLines, i), array.remove(supplyState, i)
         else
+            // UPDATED: CONFIRMED CANDLE SIGNAL LOGIC
             if currentState == 2 and bar_index > cBar + 1 and sTouched
+                // Check for confirmed bearish reversal on candle close
                 if (close < open) and (close < bBot) and (close[1] < bTop)
                     array.set(supplyState, i, 3)
                     alertSell := true
