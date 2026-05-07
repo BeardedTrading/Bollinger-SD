@@ -90,11 +90,11 @@ var int[] supplyCreationBar = array.new_int()
 var label[] demandTradeLabels = array.new_label()
 var label[] supplyTradeLabels = array.new_label()
 
-// --- State Machine Trackers (0 = Born, 1 = Detached/Armed, 2 = Inside Zone, 3 = Fired/Locked) ---
+// --- State Machine Trackers ---
 var int[] demandState = array.new_int()
 var int[] supplyState = array.new_int()
 
-// --- Running Extrema Trackers Since Creation ---
+// --- Running Extrema Trackers ---
 var float[] demandMinLow = array.new_float()
 var float[] supplyMaxHigh = array.new_float()
 
@@ -112,11 +112,9 @@ var line[] supplyTPLines = array.new_line()
 var line[] demandUnitLines = array.new_line()
 var line[] supplyUnitLines = array.new_line()
 
-// --- Persistent Variables to Track Historic Zone Indices ---
 var int lastDemandBar = na
 var int lastSupplyBar = na
 
-// --- Persistent Tracking for Potential Base Candles ---
 var int potentialDemandBaseBar = na
 var float potentialDemandBaseHigh = na
 var float potentialDemandBaseLow = na
@@ -125,7 +123,6 @@ var int potentialSupplyBaseBar = na
 var float potentialSupplyBaseHigh = na
 var float potentialSupplyBaseLow = na
 
-// --- Update Potential Base Candidates ---
 if close < open
     potentialDemandBaseBar  := bar_index
     potentialDemandBaseHigh := high
@@ -136,11 +133,9 @@ if close > open
     potentialSupplyBaseHigh := high
     potentialSupplyBaseLow  := low
 
-// --- Alert Control Variables ---
 bool alertBuy  = false
 bool alertSell = false
 
-// --- Overlap Check ---
 checkOverlap(box[] boxArray, float nTop, float nBot) =>
     bool overlaps = false
     if array.size(boxArray) > 0
@@ -151,7 +146,6 @@ checkOverlap(box[] boxArray, float nTop, float nBot) =>
                 break
     overlaps
 
-// --- Breakout Processing & Zone Creation ---
 bool isDemandTrigger = false
 if not na(potentialDemandBaseBar) and bar_index > potentialDemandBaseBar
     if high > potentialDemandBaseHigh
@@ -159,7 +153,6 @@ if not na(potentialDemandBaseBar) and bar_index > potentialDemandBaseBar
 
 if isDemandTrigger and not checkOverlap(demandBoxes, potentialDemandBaseHigh, potentialDemandBaseLow)
     int currentBaseBar = potentialDemandBaseBar
-    
     box newBox = box.new(currentBaseBar, potentialDemandBaseHigh, bar_index + offset, potentialDemandBaseLow, bgcolor=bullColor, border_color=orangeOutline, border_style=line.style_solid, border_width=1)
     array.push(demandBoxes, newBox)
     array.push(demandCreationBar, bar_index)
@@ -174,7 +167,6 @@ if isDemandTrigger and not checkOverlap(demandBoxes, potentialDemandBaseHigh, po
     if useDynamicSL and not na(lastDemandBar) and array.size(demandBoxes) > 1
         box prevBox = array.get(demandBoxes, array.size(demandBoxes) - 2)
         float prevBoxTop = box.get_top(prevBox)
-        
         int lookbackBars = bar_index - lastDemandBar
         if lookbackBars > 2
             float structuralLow = na
@@ -208,10 +200,8 @@ if isDemandTrigger and not checkOverlap(demandBoxes, potentialDemandBaseHigh, po
                 
     line tpLine = line.new(x1=currentBaseBar, y1=demandTPPrice, x2=currentBaseBar + 5, y2=demandTPPrice, color=tpColor, width=tpWidth, style=tpStyle)
     array.push(demandTPLines, tpLine)
-    
     line unitLine = line.new(x1=currentBaseBar, y1=demandSLPrice, x2=currentBaseBar, y2=demandTPPrice, color=unitColor, width=1, style=unitStyle)
     array.push(demandUnitLines, unitLine)
-    
     lastDemandBar := currentBaseBar
     potentialDemandBaseBar := na
 
@@ -222,7 +212,6 @@ if not na(potentialSupplyBaseBar) and bar_index > potentialSupplyBaseBar
 
 if isSupplyTrigger and not checkOverlap(supplyBoxes, potentialSupplyBaseHigh, potentialSupplyBaseLow)
     int currentBaseBar = potentialSupplyBaseBar
-    
     box newBox = box.new(currentBaseBar, potentialSupplyBaseHigh, bar_index + offset, potentialSupplyBaseLow, bgcolor=bearColor, border_color=orangeOutline, border_style=line.style_solid, border_width=1)
     array.push(supplyBoxes, newBox)
     array.push(supplyCreationBar, bar_index)
@@ -237,7 +226,6 @@ if isSupplyTrigger and not checkOverlap(supplyBoxes, potentialSupplyBaseHigh, po
     if useDynamicSL and not na(lastSupplyBar) and array.size(supplyBoxes) > 1
         box prevBox = array.get(supplyBoxes, array.size(supplyBoxes) - 2)
         float prevBoxBottom = box.get_bottom(prevBox)
-        
         int lookbackBars = bar_index - lastSupplyBar
         if lookbackBars > 2
             float structuralHigh = na
@@ -271,16 +259,13 @@ if isSupplyTrigger and not checkOverlap(supplyBoxes, potentialSupplyBaseHigh, po
                 
     line tpLine = line.new(x1=currentBaseBar, y1=supplyTPPrice, x2=currentBaseBar + 5, y2=supplyTPPrice, color=tpColor, width=tpWidth, style=tpStyle)
     array.push(supplyTPLines, tpLine)
-    
     line unitLine = line.new(x1=currentBaseBar, y1=supplySLPrice, x2=currentBaseBar, y2=supplyTPPrice, color=unitColor, width=1, style=unitStyle)
     array.push(supplyUnitLines, unitLine)
-    
     lastSupplyBar := currentBaseBar
     potentialSupplyBaseBar := na
 
-// --- Management ---
-float upLimit    = close * (1 + (proximityPct / 100))
-float loLimit    = close * (1 - (proximityPct / 100))
+float upLimit = close * (1 + (proximityPct / 100))
+float loLimit = close * (1 - (proximityPct / 100))
 
 // Demand Management
 if array.size(demandBoxes) > 0
@@ -289,64 +274,44 @@ if array.size(demandBoxes) > 0
         float bTop = box.get_top(b), float bBot = box.get_bottom(b)
         int cBar = array.get(demandCreationBar, i)
         label tLbl = array.get(demandTradeLabels, i)
-        line slL = array.get(demandSLLines, i)
-        line tpL = array.get(demandTPLines, i)
-        line uL  = array.get(demandUnitLines, i)
-        bool dTouched = array.get(demandTouched, i)
-        float mLow = array.get(demandMinLow, i)
-        int currentState = array.get(demandState, i)
+        line slL = array.get(demandSLLines, i), line tpL = array.get(demandTPLines, i), line uL = array.get(demandUnitLines, i)
+        bool dTouched = array.get(demandTouched, i), float mLow = array.get(demandMinLow, i), int currentState = array.get(demandState, i)
         
         if bar_index > cBar + 1
             if low < mLow
                 mLow := low
                 array.set(demandMinLow, i, mLow)
-                
-        if bar_index > cBar + 1 and not dTouched
-            if low <= bTop and high >= bBot
+            if not dTouched and (low <= bTop and high >= bBot)
                 dTouched := true
                 array.set(demandTouched, i, true)
-                
-        if bar_index > cBar + 1
             if (currentState == 0 or currentState == 3) and (close > bTop or low > bTop)
                 currentState := 1
             if currentState == 1 and low <= bTop and high >= bBot
                 currentState := 2
             array.set(demandState, i, currentState)
         
-        bool hardBreached = (close < bBot)
-        
-        if hardBreached or bBot > upLimit or bTop < loLimit
+        if (close < bBot) or bBot > upLimit or bTop < loLimit
             box.delete(b)
             if not na(tLbl)
                 label.delete(tLbl)
-            line.delete(slL)
-            line.delete(tpL)
-            line.delete(uL)
-            array.remove(demandBoxes, i), array.remove(demandCreationBar, i), array.remove(demandTradeLabels, i), array.remove(demandSLLines, i), array.remove(demandTouched, i), array.remove(demandMinLow, i)
-            array.remove(demandTPLines, i), array.remove(demandState, i)
-            array.remove(demandUnitLines, i)
+            line.delete(slL), line.delete(tpL), line.delete(uL)
+            array.remove(demandBoxes, i), array.remove(demandCreationBar, i), array.remove(demandTradeLabels, i), array.remove(demandSLLines, i), array.remove(demandTouched, i), array.remove(demandMinLow, i), array.remove(demandTPLines, i), array.remove(demandState, i), array.remove(demandUnitLines, i)
         else
             if currentState == 2 and bar_index > cBar + 1 and dTouched
                 if (close > open) and (close > bTop) and (close[1] > bBot)
                     array.set(demandState, i, 3)
                     alertBuy := true
+                    strategy.entry("Long", strategy.long), strategy.exit("X Long", "Long", stop=line.get_y1(slL), limit=line.get_y1(tpL))
+                    box.set_border_color(b, color.new(color.green, 40)), box.set_border_width(b, 1)
                     
-                    float sl = line.get_y1(slL)
-                    float tp = line.get_y1(tpL)
-                    
-                    strategy.entry("Long", strategy.long)
-                    strategy.exit("X Long", "Long", stop=sl, limit=tp)
-                    
-                    box.set_border_color(b, color.new(color.green, 40))
-                    box.set_border_width(b, 1)
-                    
-                    // Confluence Logic Update
                     bool lowerBBTouched = false
+                    bool upperBBTouched_Exclusion = false
                     if useBB
                         for j = 0 to bbLookback
                             if low[j] <= lowerBand[j]
                                 lowerBBTouched := true
-                                break
+                            if high[j] >= upperBand[j]
+                                upperBBTouched_Exclusion := true
                     
                     bool closeAboveEma = useBB and ((close - bbBasis) >= emaThreshold)
                     bool emaSlopeUp   = useBB and (bbBasis > bbBasis[1])
@@ -354,18 +319,15 @@ if array.size(demandBoxes) > 0
                     string labelString = "BUY"
                     color  labelColor  = #a0c4ff 
                     
-                    if useBB
-                        // A++: Both conditions met
+                    if useBB and not upperBBTouched_Exclusion
                         if lowerBBTouched and closeAboveEma
                             labelString := "BUY A++"
-                            labelColor  := #0052cc 
-                        // A+: EMA Slope must agree with Direction AND (BB or Price Close) met
+                            labelColor := #0052cc 
                         else if emaSlopeUp and (lowerBBTouched or closeAboveEma)
                             labelString := "BUY A+"
-                            labelColor  := #3a86ff 
+                            labelColor := #3a86ff 
                     
                     label signalLabel = label.new(bar_index, low, text=labelString, style=label.style_triangleup, color=labelColor, textcolor=labelColor, size=size.small, yloc=yloc.belowbar, text_formatting=text.format_bold)
-                    
                     if not na(tLbl)
                         label.delete(tLbl)
                     array.set(demandTradeLabels, i, signalLabel)
@@ -378,64 +340,44 @@ if array.size(supplyBoxes) > 0
         float bTop = box.get_top(b), float bBot = box.get_bottom(b)
         int cBar = array.get(supplyCreationBar, i)
         label tLbl = array.get(supplyTradeLabels, i)
-        line slL = array.get(supplySLLines, i)
-        line tpL = array.get(supplyTPLines, i)
-        line uL  = array.get(supplyUnitLines, i)
-        bool sTouched = array.get(supplyTouched, i)
-        float mHigh = array.get(supplyMaxHigh, i)
-        int currentState = array.get(supplyState, i)
+        line slL = array.get(supplySLLines, i), line tpL = array.get(supplyTPLines, i), line uL = array.get(supplyUnitLines, i)
+        bool sTouched = array.get(supplyTouched, i), float mHigh = array.get(supplyMaxHigh, i), int currentState = array.get(supplyState, i)
         
         if bar_index > cBar + 1
             if high > mHigh
                 mHigh := high
                 array.set(supplyMaxHigh, i, mHigh)
-                
-        if bar_index > cBar + 1 and not sTouched
-            if high >= bBot and low <= bTop
+            if not sTouched and (high >= bBot and low <= bTop)
                 sTouched := true
                 array.set(supplyTouched, i, true)
-                
-        if bar_index > cBar + 1
             if (currentState == 0 or currentState == 3) and (close < bBot or high < bBot)
                 currentState := 1
             if currentState == 1 and high >= bBot and low <= bTop
                 currentState := 2
             array.set(supplyState, i, currentState)
         
-        bool hardBreached = (close > bTop)
-        
-        if hardBreached or bBot > upLimit or bTop < loLimit
+        if (close > bTop) or bBot > upLimit or bTop < loLimit
             box.delete(b)
             if not na(tLbl)
                 label.delete(tLbl)
-            line.delete(slL)
-            line.delete(tpL)
-            line.delete(uL)
-            array.remove(supplyBoxes, i), array.remove(supplyCreationBar, i), array.remove(supplyTradeLabels, i), array.remove(supplySLLines, i), array.remove(supplyTouched, i), array.remove(supplyMaxHigh, i)
-            array.remove(supplyTPLines, i), array.remove(supplyState, i)
-            array.remove(supplyUnitLines, i)
+            line.delete(slL), line.delete(tpL), line.delete(uL)
+            array.remove(supplyBoxes, i), array.remove(supplyCreationBar, i), array.remove(supplyTradeLabels, i), array.remove(supplySLLines, i), array.remove(supplyTouched, i), array.remove(supplyMaxHigh, i), array.remove(supplyTPLines, i), array.remove(supplyState, i), array.remove(supplyUnitLines, i)
         else
             if currentState == 2 and bar_index > cBar + 1 and sTouched
                 if (close < open) and (close < bBot) and (close[1] < bTop)
                     array.set(supplyState, i, 3)
                     alertSell := true
+                    strategy.entry("Short", strategy.short), strategy.exit("X Short", "Short", stop=line.get_y1(slL), limit=line.get_y1(tpL))
+                    box.set_border_color(b, color.new(color.red, 40)), box.set_border_width(b, 1)
                     
-                    float sl = line.get_y1(slL)
-                    float tp = line.get_y1(tpL)
-                    
-                    strategy.entry("Short", strategy.short)
-                    strategy.exit("X Short", "Short", stop=sl, limit=tp)
-                    
-                    box.set_border_color(b, color.new(color.red, 40))
-                    box.set_border_width(b, 1)
-                    
-                    // Confluence Logic Update
                     bool upperBBTouched = false
+                    bool lowerBBTouched_Exclusion = false
                     if useBB
                         for j = 0 to bbLookback
                             if high[j] >= upperBand[j]
                                 upperBBTouched := true
-                                break
+                            if low[j] <= lowerBand[j]
+                                lowerBBTouched_Exclusion := true
                     
                     bool closeBelowEma = useBB and ((bbBasis - close) >= emaThreshold)
                     bool emaSlopeDown  = useBB and (bbBasis < bbBasis[1])
@@ -443,26 +385,21 @@ if array.size(supplyBoxes) > 0
                     string labelString = "SELL"
                     color  labelColor  = #ffb7b2 
                     
-                    if useBB
-                        // A++: Both conditions met
+                    if useBB and not lowerBBTouched_Exclusion
                         if upperBBTouched and closeBelowEma
                             labelString := "SELL A++"
-                            labelColor  := #9b0000 
-                        // A+: EMA Slope must agree with Direction AND (BB or Price Close) met
+                            labelColor := #9b0000 
                         else if emaSlopeDown and (upperBBTouched or closeBelowEma)
                             labelString := "SELL A+"
-                            labelColor  := #ff3333 
+                            labelColor := #ff3333 
                     
                     label signalLabel = label.new(bar_index, high, text=labelString, style=label.style_triangledown, color=labelColor, textcolor=labelColor, size=size.small, yloc=yloc.abovebar, text_formatting=text.format_bold)
-                    
                     if not na(tLbl)
                         label.delete(tLbl)
                     array.set(supplyTradeLabels, i, signalLabel)
             box.set_right(b, bar_index + offset)
 
-// --- Alert Execution ---
 if alertBuy
     alert("BUY Signal: Demand Zone Retest at " + str.tostring(close), alert.freq_once_per_bar_close)
-
 if alertSell
     alert("SELL Signal: Supply Zone Retest at " + str.tostring(close), alert.freq_once_per_bar_close)

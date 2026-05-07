@@ -67,18 +67,19 @@ State 2 is achieved when the market experiences a true counter-trend pullback, b
 
 ### 🔒 State 3: Fired & Locked (Tiered Confluence Matrix)
 
-State 3 represents trade confirmation and immediate risk isolation. Upon a confirmed reversal candle body (`close > open` for longs, `close < open` for shorts), the engine evaluates a three-tier confluence scoring system.
+State 3 represents trade confirmation and immediate risk isolation. Upon a confirmed reversal candle body (`close > open` for longs, `close < open` for shorts), the engine evaluates a tiered confluence scoring system.
 
 | Signal Tier | Requirements | Visual Style |
 | :--- | :--- | :--- |
-| **A++ (Elite)** | BB Touch (within `bbLookback`) **AND** EMA Close Distance met | Solid Bold Hue (Vivid Intensity) |
-| **A+ (Premium)** | EMA Slope agrees with Direction **AND** (BB Touch **OR** EMA Close met) | Intermediate Bold Shade |
-| **Standard** | Core Retest Engine fired without extra confluence | Lighter Bold Shade |
+| **A++ (Elite)** | (BB Touch **AND** EMA Close Distance met) **AND** No Opposing Band Touch | Solid Vivid Hue |
+| **A+ (Premium)** | EMA Slope agrees with Direction **AND** (BB Touch **OR** EMA Close met) **AND** No Opposing Band Touch | Intermediate Shade |
+| **Standard** | Core Retest Engine fired; premium criteria not met or Opposing Band touched | Lighter Shade |
 
-#### A. Confluence Filters
-* **BB Lookback Window:** Scans a custom historical window (`bbLookback`) prior to the signal for volatility exhaustion (touches/pierces of the upper/lower bands).
+#### A. Confluence Filters & Exclusion Rules
+* **BB Lookback Window:** Scans a custom historical window (`bbLookback`) prior to the signal for volatility exhaustion (touches/pierces of the bands).
 * **EMA Basis Threshold:** Requires the signal candle to close a specific distance (adjustable points via `emaThreshold`) above or below the 20-period EMA basis line to qualify for premium ratings.
-* **Trend Alignment (Slope):** For **A+** ratings, the slope of the 20-period EMA must agree with the trade direction (sloping up for Buys, down for Sells).
+* **EMA Slope Alignment:** For **A+** ratings, the slope of the EMA basis line must agree with the trade direction (sloping up for BUY, sloping down for SELL).
+* **Opposing Band Exclusion:** Even if all other criteria are met, any setup that has touched the **opposing** Bollinger Band within the lookback window is disqualified from premium ratings (A+/A++) and relegated to a standard signal to avoid buying/selling into over-extension.
 
 #### B. Execution & Graphic Output
 * **Broker Execution:** Executes a `strategy.entry()` order using the static y-positions of the original anchor lines (`line.get_y1()`) to calculate risk distribution.
