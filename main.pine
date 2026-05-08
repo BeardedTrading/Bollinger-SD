@@ -1,5 +1,5 @@
 //@version=6
-strategy("Bearded Trading BB-SD", overlay=true, max_boxes_count=500, initial_capital=10000)
+strategy("Bearded Trading BB-SD", overlay=true, max_boxes_count=500, initial_capital=10000, calc_on_every_tick=true)
 
 // ==========================================
 // --- SECTION 1: CORE STRATEGY INPUTS ---
@@ -27,23 +27,19 @@ bbStdDev     = input.float(2.0, "BB Standard Deviation", minval=0.001, step=0.1,
 bullColor = input.color(color.new(color.green, 85), "Demand Zone Background Color", group="🎨 Graphic & Style Customizers")
 bearColor = input.color(color.new(color.red, 85), "Supply Zone Background Color", group="🎨 Graphic & Style Customizers")
 
-// Stop Loss Customizer
 slColor   = input.color(color.red, "Stop Loss Line Color", group="🎨 Graphic & Style Customizers")
 slWidth   = input.int(3, "Stop Loss Line Thickness", minval=1, maxval=10, group="🎨 Graphic & Style Customizers")
 slStyleIn = input.string("Solid", "Stop Loss Line Format", options=["Solid", "Dashed", "Dotted"], group="🎨 Graphic & Style Customizers")
 
-// Take Profit Customizer
 tpColor   = input.color(color.green, "Take Profit Line Color", group="🎨 Graphic & Style Customizers")
 tpWidth   = input.int(3, "Take Profit Line Thickness", minval=1, maxval=10, group="🎨 Graphic & Style Customizers")
 tpStyleIn = input.string("Solid", "Take Profit Line Format", options=["Solid", "Dashed", "Dotted"], group="🎨 Graphic & Style Customizers")
 
-// Bollinger Bands Plots Customizer
 bbBasisColor = input.color(color.gray, "BB Basis Line Color", group="🎨 Graphic & Style Customizers")
 bbBasisWidth = input.int(1, "BB Basis Line Thickness", minval=1, maxval=10, group="🎨 Graphic & Style Customizers")
 bbBandsColor = input.color(color.blue, "BB Upper/Lower Lines Color", group="🎨 Graphic & Style Customizers")
 bbBandsWidth = input.int(1, "BB Upper/Lower Lines Thickness", minval=1, maxval=10, group="🎨 Graphic & Style Customizers")
 
-// --- Map String Dropdowns to Core Line Style Constants ---
 getLineStyle(styleString) =>
     switch styleString
         "Solid"  => line.style_solid
@@ -57,6 +53,7 @@ tpStyle   = getLineStyle(tpStyleIn)
 // ==========================================
 // --- BOLLINGER BANDS ENGINE CALCULATIONS ---
 // ==========================================
+// Fix for CE10013: Using explicit if/else to avoid ternary operator conflicts
 float bbBasis = na
 if bbType == "SMA"
     bbBasis := ta.sma(bbSource, bbLength)
@@ -71,32 +68,24 @@ plot(useBB ? bbBasis : na, "BB Basis", color=bbBasisColor, linewidth=bbBasisWidt
 plot(useBB ? upperBand : na, "BB Upper", color=bbBandsColor, linewidth=bbBandsWidth)
 plot(useBB ? lowerBand : na, "BB Lower", color=bbBandsColor, linewidth=bbBandsWidth)
 
-// --- Constants for Initial Unconfirmed State ---
+// --- SIGNAL GATING LOGIC ---
+// Ensures visual updates are tick-by-tick while orders wait for confirmation [cite: 81, 96]
+bool isBarClosed = barstate.isconfirmed 
+
 color orangeOutline = color.new(color.orange, 30)
 
-// --- Arrays for Boxes and Signal Objects ---
 var box[] demandBoxes = array.new_box()
 var box[] supplyBoxes = array.new_box()
 var int[] demandCreationBar = array.new_int()
 var int[] supplyCreationBar = array.new_int()
-
-// --- Multi-Label Garbage Collection Arrays ---
 var label[] demandTradeLabels = array.new_label()
 var label[] supplyTradeLabels = array.new_label()
-
-// --- State Machine Trackers ---
 var int[] demandState = array.new_int()
 var int[] supplyState = array.new_int()
-
-// --- Running Extrema Trackers ---
 var float[] demandMinLow = array.new_float()
 var float[] supplyMaxHigh = array.new_float()
-
-// --- Tracking Arrays for Active Retest Status ---
 var bool[] demandTouched = array.new_bool()
 var bool[] supplyTouched = array.new_bool()
-
-// --- Arrays for Stop-Loss & Take-Profit Lines ---
 var line[] demandSLLines = array.new_line()
 var line[] supplySLLines = array.new_line()
 var line[] demandTPLines = array.new_line()
@@ -104,11 +93,9 @@ var line[] supplyTPLines = array.new_line()
 
 var int lastDemandBar = na
 var int lastSupplyBar = na
-
 var int potentialDemandBaseBar = na
 var float potentialDemandBaseHigh = na
 var float potentialDemandBaseLow = na
-
 var int potentialSupplyBaseBar = na
 var float potentialSupplyBaseHigh = na
 var float potentialSupplyBaseLow = na
@@ -119,7 +106,7 @@ if close < open
     potentialDemandBaseLow  := low
 
 if close > open
-    potentialSupplyBaseBar  := bar_index
+    potentialSupplyBaseBar := bar_index
     potentialSupplyBaseHigh := high
     potentialSupplyBaseLow  := low
 
@@ -243,7 +230,7 @@ if isSupplyTrigger and not checkOverlap(supplyBoxes, potentialSupplyBaseHigh, po
                     if na(structuralLow) or low[histIndex] < structuralLow
                         structuralLow := low[histIndex]
             if not na(structuralLow) and structuralLow < potentialSupplyBaseLow
-                supplyTPPrice := structuralLow - (syminfo.mintick * tpBuffer)
+                supplyTPPrice := structuralLow - (syminfo.mintick * tickBuffer)
                 
     line tpLine = line.new(x1=currentBaseBar, y1=supplyTPPrice, x2=currentBaseBar + 5, y2=supplyTPPrice, color=tpColor, width=tpWidth, style=tpStyle)
     array.push(supplyTPLines, tpLine)
@@ -283,16 +270,17 @@ if array.size(demandBoxes) > 0
             line.delete(slL), line.delete(tpL)
             array.remove(demandBoxes, i), array.remove(demandCreationBar, i), array.remove(demandTradeLabels, i), array.remove(demandSLLines, i), array.remove(demandTouched, i), array.remove(demandMinLow, i), array.remove(demandTPLines, i), array.remove(demandState, i)
         else
-            // UPDATED: CONFIRMED CANDLE SIGNAL LOGIC
             if currentState == 2 and bar_index > cBar + 1 and dTouched
-                // Check for confirmed bullish reversal on candle close
                 if (close > open) and (close > bTop) and (close[1] > bBot)
                     array.set(demandState, i, 3)
                     alertBuy := true
-                    strategy.entry("Long", strategy.long), strategy.exit("X Long", "Long", stop=line.get_y1(slL), limit=line.get_y1(tpL))
+                    
+                    // Signal confirmation gate for orders [cite: 81]
+                    if isBarClosed
+                        strategy.entry("Long", strategy.long), strategy.exit("X Long", "Long", stop=line.get_y1(slL), limit=line.get_y1(tpL))
+                    
                     box.set_border_color(b, color.new(color.green, 40)), box.set_border_width(b, 1)
                     
-                    // --- REFINED CONFLUENCE LOGIC ---
                     bool lowerBBTouched = false
                     bool upperBBTouched_Exclusion = false
                     if useBB
@@ -302,19 +290,15 @@ if array.size(demandBoxes) > 0
                             if high[j] >= upperBand[j]
                                 upperBBTouched_Exclusion := true
                     
-                    bool priceAboveEma = useBB and (close > bbBasis)
-                    bool emaSlopeUp    = useBB and (bbBasis > bbBasis[1])
-                    
+                    bool emaSlopeUp = useBB and (bbBasis > bbBasis[1])
                     string labelString = "BUY"
-                    color  labelColor  = #a0c4ff 
+                    color  labelColor  = #a0c4ff
                     
                     if useBB and not upperBBTouched_Exclusion
-                        // A++: Trend Agreement AND Price position AND BB Touch
-                        if emaSlopeUp and priceAboveEma and lowerBBTouched
-                            labelString := "BUY A++", labelColor := #0052cc 
-                        // A+: Trend Agreement AND (Price position OR BB Touch)
-                        else if emaSlopeUp and (priceAboveEma or lowerBBTouched)
-                            labelString := "BUY A+", labelColor := #3a86ff 
+                        if lowerBBTouched and emaSlopeUp
+                            labelString := "BUY A++", labelColor := #0052cc
+                        else if lowerBBTouched
+                            labelString := "BUY A+", labelColor := #3a86ff
                     
                     label signalLabel = label.new(bar_index, low, text=labelString, style=label.style_triangleup, color=labelColor, textcolor=labelColor, size=size.small, yloc=yloc.belowbar, text_formatting=text.format_bold)
                     if not na(tLbl)
@@ -352,13 +336,15 @@ if array.size(supplyBoxes) > 0
             line.delete(slL), line.delete(tpL)
             array.remove(supplyBoxes, i), array.remove(supplyCreationBar, i), array.remove(supplyTradeLabels, i), array.remove(supplySLLines, i), array.remove(supplyTouched, i), array.remove(supplyMaxHigh, i), array.remove(supplyTPLines, i), array.remove(supplyState, i)
         else
-            // UPDATED: CONFIRMED CANDLE SIGNAL LOGIC
             if currentState == 2 and bar_index > cBar + 1 and sTouched
-                // Check for confirmed bearish reversal on candle close
                 if (close < open) and (close < bBot) and (close[1] < bTop)
                     array.set(supplyState, i, 3)
                     alertSell := true
-                    strategy.entry("Short", strategy.short), strategy.exit("X Short", "Short", stop=line.get_y1(slL), limit=line.get_y1(tpL))
+                    
+                    // Signal confirmation gate for orders [cite: 96]
+                    if isBarClosed
+                        strategy.entry("Short", strategy.short), strategy.exit("X Short", "Short", stop=line.get_y1(slL), limit=line.get_y1(tpL))
+                    
                     box.set_border_color(b, color.new(color.red, 40)), box.set_border_width(b, 1)
                     
                     bool upperBBTouched = false
@@ -370,19 +356,15 @@ if array.size(supplyBoxes) > 0
                             if low[j] <= lowerBand[j]
                                 lowerBBTouched_Exclusion := true
                     
-                    bool priceBelowEma = useBB and (close < bbBasis)
-                    bool emaSlopeDown  = useBB and (bbBasis < bbBasis[1])
-                    
+                    bool emaSlopeDown = useBB and (bbBasis < bbBasis[1])
                     string labelString = "SELL"
-                    color  labelColor  = #ffb7b2 
+                    color  labelColor  = #ffb7b2
                     
                     if useBB and not lowerBBTouched_Exclusion
-                        // A++: Trend Agreement AND Price position AND BB Touch
-                        if emaSlopeDown and priceBelowEma and upperBBTouched
-                            labelString := "SELL A++", labelColor := #9b0000 
-                        // A+: Trend Agreement AND (Price position OR BB Touch)
-                        else if emaSlopeDown and (priceBelowEma or upperBBTouched)
-                            labelString := "SELL A+", labelColor := #ff3333 
+                        if upperBBTouched and emaSlopeDown
+                            labelString := "SELL A++", labelColor := #9b0000
+                        else if upperBBTouched
+                            labelString := "SELL A+", labelColor := #ff3333
                     
                     label signalLabel = label.new(bar_index, high, text=labelString, style=label.style_triangledown, color=labelColor, textcolor=labelColor, size=size.small, yloc=yloc.abovebar, text_formatting=text.format_bold)
                     if not na(tLbl)
