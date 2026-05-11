@@ -83,6 +83,9 @@ var float[] demandMinLow = array.new_float()
 var float[] supplyMaxHigh = array.new_float()
 var bool[] demandTouched = array.new_bool()
 var bool[] supplyTouched = array.new_bool()
+// NEW: Track precisely when the retest occurred
+var int[] demandTouchBar = array.new_int()
+var int[] supplyTouchBar = array.new_int()
 
 // --- Arrays for Price Levels (Stored at Creation) ---
 var float[] demandSLPrices = array.new_float()
@@ -142,6 +145,7 @@ if isDemandTrigger
     array.push(demandTradeLabels, na)
     array.push(demandState, 1) 
     array.push(demandTouched, false)
+    array.push(demandTouchBar, 0)
     array.push(demandMinLow, high)
     array.push(demandSLLines, na)
     array.push(demandTPLines, na)
@@ -164,6 +168,7 @@ if isSupplyTrigger
     array.push(supplyTradeLabels, na)
     array.push(supplyState, 1) 
     array.push(supplyTouched, false)
+    array.push(supplyTouchBar, 0)
     array.push(supplyMaxHigh, low)
     array.push(supplySLLines, na)
     array.push(supplyTPLines, na)
@@ -195,12 +200,17 @@ if array.size(demandBoxes) > 0
                 if not bodyIn
                     dTouched := true
                     array.set(demandTouched, i, true)
-                    // RETEST ALERT: Sent on candle close of a valid wick retest
+                    array.set(demandTouchBar, i, bar_index)
                     if barstate.isconfirmed
                         alert("Early Warning: Valid Red Wick Retest at Demand Zone. Prepare for potential BUY.", alert.freq_once_per_bar)
                 else
                     dTouched := false
                     array.set(demandTouched, i, false)
+
+            // RETEST EXPIRY: If signal hasn't fired within 2 bars of the wick, clear the 'Touched' state
+            if dTouched and (bar_index - array.get(demandTouchBar, i) > 2)
+                dTouched := false
+                array.set(demandTouched, i, false)
 
             if (currentState == 1 or currentState == 3) and dTouched
                 currentState := 2
@@ -216,7 +226,7 @@ if array.size(demandBoxes) > 0
                 line.delete(tpL)
             array.remove(demandBoxes, i), array.remove(demandCreationBar, i), array.remove(demandTradeLabels, i), array.remove(demandState, i)
             array.remove(demandTouched, i), array.remove(demandMinLow, i), array.remove(demandSLPrices, i), array.remove(demandTPPrices, i)
-            array.remove(demandSLLines, i), array.remove(demandTPLines, i)
+            array.remove(demandSLLines, i), array.remove(demandTPLines, i), array.remove(demandTouchBar, i)
         else
             if currentState == 2 and dTouched
                 if (close > open) and (close > bTop)
@@ -297,12 +307,17 @@ if array.size(supplyBoxes) > 0
                 if not bodyIn
                     sTouched := true
                     array.set(supplyTouched, i, true)
-                    // RETEST ALERT: Sent on candle close of a valid wick retest
+                    array.set(supplyTouchBar, i, bar_index)
                     if barstate.isconfirmed
                         alert("Early Warning: Valid Green Wick Retest at Supply Zone. Prepare for potential SELL.", alert.freq_once_per_bar)
                 else
                     sTouched := false
                     array.set(supplyTouched, i, false)
+
+            // RETEST EXPIRY: If signal hasn't fired within 2 bars of the wick, clear the 'Touched' state
+            if sTouched and (bar_index - array.get(supplyTouchBar, i) > 2)
+                sTouched := false
+                array.set(supplyTouched, i, false)
 
             if (currentState == 1 or currentState == 3) and sTouched
                 currentState := 2
@@ -318,13 +333,12 @@ if array.size(supplyBoxes) > 0
                 line.delete(tpL)
             array.remove(supplyBoxes, i), array.remove(supplyCreationBar, i), array.remove(supplyTradeLabels, i), array.remove(supplyState, i)
             array.remove(supplyTouched, i), array.remove(supplyMaxHigh, i), array.remove(supplySLPrices, i), array.remove(supplyTPPrices, i)
-            array.remove(supplySLLines, i), array.remove(supplyTPLines, i)
+            array.remove(supplySLLines, i), array.remove(supplyTPLines, i), array.remove(supplyTouchBar, i)
         else
             if currentState == 2 and sTouched
                 if (close < open) and (close < bBot)
                     array.set(supplyState, i, 3), alertSell := true
-                    float slP = high + (syminfo.mintick * tickBuffer)
-                    float tpP = low - (syminfo.mintick * tpBuffer)
+                    float slP = high + (syminfo.mintick * tickBuffer), float tpP = low - (syminfo.mintick * tpBuffer)
 
                     if useDynamicSL and not na(lastSupplyBar)
                         int lb = bar_index - lastSupplyBar
