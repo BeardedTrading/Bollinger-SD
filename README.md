@@ -23,70 +23,70 @@ Unlike basic binary indicators (Active / Dead), this engine structures its paral
 Every zone begins its existence in State 0. It serves as an unconfirmed structure and is strictly forbidden from evaluating entries or firing signals.
 
 #### A. Zone Discovery & Filtering Rules
-* **Base Candle Identification:** * **Demand Base Candidate:** Any bearish candle close (`close < open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
-    * **Supply Base Candidate:** Any bullish candle close (`close > open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$).
+* **Base Candle Identification:** * **Demand Base Candidate:** Any bearish candle close (`close < open`). The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$). [cite: 59]
+    * **Supply Base Candidate:** Any bullish candle close (`close > open`). [cite_start]The engine caches its `bar_index`, `high` ($bTop$), and `low` ($bBot$). [cite: 59]
 * **Breakout Confirmation:** A candidate transitions from a cached state to an official active zone box when a subsequent candle aggressively breaches the base extremes:
-    * **Demand Zone:** A candle high breaks strictly above base high (`high > potentialDemandBaseHigh`).
-    * **Supply Zone:** A candle low breaks strictly below base low (`low < potentialSupplyBaseLow`).
-* **The Overlap Prevention Filter:** Before structural allocation, the new zone is processed through the `checkOverlap()` layout grid scan. If the top and bottom coordinates fall within the boundaries of an existing active box, it is classified as a duplicate and discarded.
+    * [cite_start]**Demand Zone:** A candle high breaks strictly above base high (`high > potentialDemandBaseHigh`). [cite: 59]
+    * [cite_start]**Supply Zone:** A candle low breaks strictly below base low (`low < potentialSupplyBaseLow`). [cite: 59]
+* **Structure Preservation:** Every confirmed structural breakout creates a unique zone. [cite_start]The engine permits overlapping zones to persist, ensuring historical support and resistance levels remain visible even if they reside within newer structures. [cite: 59]
 
 #### B. Risk Management & Visual Unit
-Risk management price levels are no longer anchored to the zone discovery phase; instead, the calculation engine waits for the signal candle to define the trade's defensive and objective boundaries.
+[cite_start]Risk management price levels are no longer anchored to the zone discovery phase; instead, the calculation engine waits for the signal candle to define the trade's defensive and objective boundaries. [cite: 59]
 
 ---
 
 ### 🛡️ State 1: Detached & Armed (The Anti-Spam Shield)
 
-A zone enters State 1 when price action explicitly breaks away and separates from the zone coordinates. This acts as a protective shield ensuring the engine ignores follow-through momentum bars on the initial breakout trend expansion run.
+[cite_start]A zone enters State 1 immediately upon discovery and serves as the primary gating mechanism for retest validation. [cite: 59]
 
 #### A. Transition Prerequisites
-* **Demand Zone Arming:** The zone switches to State 1 only when a candle close or a candle low prints completely above the zone top line (`close > bTop` or `low > bTop`).
-* **Supply Zone Arming:** The zone switches to State 1 only when a candle close or a candle high prints completely below the zone bottom line (`close < bBot` or `high < bBot`).
+* [cite_start]**Demand Zone Arming:** The zone is armed and ready for a retest once it is successfully drawn on the chart. [cite: 59]
+* [cite_start]**Supply Zone Arming:** The zone is armed and ready for a retest once it is successfully drawn on the chart. [cite: 59]
 
 ---
 
-### 🏹 State 2: Touch Detected (Retest Validation & Pullback Tracking)
+### 🏹 State 2: Touch Detected (Retest Validation & Early Warning)
 
-State 2 is achieved when the market experiences a true counter-trend pullback, bringing price action back into the active historical boundaries.
+[cite_start]State 2 is achieved when the market pulls back into the active historical boundaries with specific candlestick characteristics. [cite: 59]
 
 #### A. RETEST Criteria Rules
-* **Demand Retest Boundary:** While in State 1, a candle wick successfully penetrates the active zone boundaries (`low <= bTop` and `high >= bBot`).
-* **Supply Retest Boundary:** While in State 1, a candle wick successfully penetrates the active zone boundaries (`high >= bBot` and `low <= bTop`).
+* **Correct Color Wick Requirement:**
+    * [cite_start]**Demand Retest:** Strictly requires a **Bearish (Red)** candle wick to penetrate the zone boundaries. [cite: 59]
+    * [cite_start]**Supply Retest:** Strictly requires a **Bullish (Green)** candle wick to penetrate the zone boundaries. [cite: 59]
+* [cite_start]**No-Body-Close Restriction:** If the retesting candle body closes **inside** the zone boundaries, the retest is disqualified. [cite: 59] [cite_start]The zone remains on the chart and stays **Orange**, requiring a fresh, valid wick rejection to re-arm. [cite: 59]
+* [cite_start]**Early Warning Alerts:** The strategy issues a real-time alert upon the close of a valid retest candle. [cite: 59] [cite_start]This allows the user to prepare for a potential entry before the reversal signal is confirmed. [cite: 59]
 
 ---
 
 ### 🔒 State 3: Fired & Locked (Tiered Confluence Matrix)
 
-State 3 represents trade confirmation. Upon a confirmed reversal candle body (`close > open` for longs, `close < open` for shorts), the engine evaluates a tiered confluence scoring system.
+[cite_start]State 3 represents trade confirmation and execution. [cite: 59]
+
+#### A. Signal Execution Gates
+* [cite_start]**Exit Confirmation:** A BUY or SELL signal fires only after a valid retest has occurred AND a subsequent reversal candle (Green for BUY, Red for SELL) closes **completely outside** the zone boundaries. [cite: 59]
+* [cite_start]**Signal Replacement logic:** If a zone is retested multiple times, the engine automatically deletes the previous signal objects (Labels, SL/TP lines) and anchors the new signal to the most recent valid retest candle. [cite: 59]
 
 | Signal Tier | Requirements | Visual Style |
 | :--- | :--- | :--- |
-| **A++ (Elite Momentum)** | **BB Touch/Pierce** within lookback **AND** **EMA Slope** agrees with trade direction | Solid Vivid Hue |
-| **A+ (Premium Rejection)** | **BB Touch/Pierce** within lookback (represents volatility rejection) | Intermediate Shade |
-| **Standard** | Core Retest Engine fired without a recent Bollinger Band touch | Lighter Shade |
-
-#### A. Confluence Filters & Exclusion Rules
-* **BB Volatility Rejection:** For A+/A++ tiers, price must have touched or pierced the respective Bollinger Band within the `bbLookback` window.
-* **EMA Trend Alignment (A++):** For Elite Momentum, the slope of the EMA basis must align with the trade (sloping up for BUY, sloping down for SELL).
-* **Opposing Band Exclusion:** Any setup touching the **opposing** Bollinger Band within the lookback window is disqualified from A+/A++ status to avoid over-extension.
+| **A++ (Elite Momentum)** | **BB Touch/Pierce** within lookback **AND** **EMA Slope** agrees with trade direction | [cite_start]Solid Vivid Hue [cite: 59] |
+| **A+ (Premium Rejection)** | **BB Touch/Pierce** within lookback (represents volatility rejection) | [cite_start]Intermediate Shade [cite: 59] |
+| **Standard** | Core Retest Engine fired without a recent Bollinger Band touch | [cite_start]Lighter Shade [cite: 59] |
 
 #### B. Execution & Graphic Output
-* **Real-Time Visuals:** The strategy uses `calc_on_every_tick=true` to ensure Bollinger Bands and EMA basis lines cover the forming candle.
-* **Execution Gating:** Orders are gated by `barstate.isconfirmed` to prevent "repainting" or premature entries before the signal candle closes.
-* **Dynamic Risk Anchoring:** * **Stop Loss (SL):** Calculated relative to the **Signal Candle Low** (Demand) or **High** (Supply) plus the `tickBuffer`.
-    * **Take Profit (TP):** Calculated relative to the **Signal Candle High** (Demand) or **Low** (Supply) plus the `tpBuffer`.
-    * **Visual Lines:** Lines are drawn starting on the signal candle and extend for 5 bars.
-* **The Infinite Retest Loop Reset:** After a signal fires, the zone switches to State 3 and becomes inactive until price resets the sequence back to **State 1**.
+* [cite_start]**Real-Time Visuals:** The strategy uses `calc_on_every_tick=true` for real-time EMA and Bollinger Band tracking. [cite: 59]
+* [cite_start]**Dynamic Risk Anchoring:** * **Stop Loss (SL):** Calculated relative to the **Signal Candle Low** (Demand) or **High** (Supply) plus the `tickBuffer`. [cite: 59]
+    * [cite_start]**Take Profit (TP):** Calculated relative to the **Signal Candle High** (Demand) or **Low** (Supply) plus the `tpBuffer`. [cite: 59]
+* [cite_start]**Visual Transitions:** Zone borders remain **Orange** during the retest phase and only transition to **Green** (Demand) or **Red** (Supply) once an entry signal is officially confirmed. [cite: 59]
 
 ---
 
 ## 🛑 Global State Exceptions: Zone Invalidation & Garbage Collection
 
-Active zones are evaluated on every bar close. If a zone violates baseline parameters, it is subjected to an immediate Dynamic Garbage Collection Routine.
+Active zones are evaluated on every bar close. [cite_start]If a zone violates baseline parameters, it is subjected to an immediate Dynamic Garbage Collection Routine. [cite: 59]
 
 ### Invalidation Triggers
-* **Raw Boundary Breach (Hard Breach):** A candle body explicitly closes beyond the defensive wall line (`close < bBot` for Demand; `close > bTop` for Supply).
-* **Proximity Limit Breach:** The current market price drifts too far away, exceeding the `proximityPct` threshold.
+* [cite_start]**Hard Breach:** A candle body explicitly closes beyond the defensive outer wall line of the zone. [cite: 59]
+* [cite_start]**Proximity Limit Breach:** The current market price drifts too far away, exceeding the `proximityPct` threshold. [cite: 59]
 
 ---
 
@@ -94,11 +94,11 @@ Active zones are evaluated on every bar close. If a zone violates baseline param
 
 | Array Variable Name | Functional Application |
 | :--- | :--- |
-| `demandBoxes` / `supplyBoxes` | Visual zone block coordinates rendering |
-| `demandTradeLabels` / `supplyTradeLabels` | Tiered execution indicators (A++, A+, BUY/SELL) |
-| `demandState` / `supplyState` | Controls the 4-stage anti-spam engine gates |
-| `demandSLLines` / `supplySLLines` | Signal-anchored Stop Loss markers (5-bar length) |
-| `demandTPLines` / `supplyTPLines` | Signal-anchored Take Profit markers (5-bar length) |
+| `demandBoxes` / `supplyBoxes` | [cite_start]Visual zone block coordinates rendering [cite: 59] |
+| `demandTradeLabels` / `supplyTradeLabels` | [cite_start]Tiered execution indicators (A++, A+, BUY/SELL) [cite: 59] |
+| `demandState` / `supplyState` | [cite_start]Controls the sequential signal engine gates [cite: 59] |
+| `demandSLLines` / `supplySLLines` | [cite_start]Signal-anchored Stop Loss markers (updated to most recent retest) [cite: 59] |
+| `demandTPLines` / `supplyTPLines` | [cite_start]Signal-anchored Take Profit markers (updated to most recent retest) [cite: 59] |
 
 ---
 
