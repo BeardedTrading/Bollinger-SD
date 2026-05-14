@@ -21,6 +21,11 @@ bbSource     = input.source(close, "BB Source", group="📊 Bollinger Bands Engi
 bbType       = input.string("EMA", "BB Basis Type", options=["SMA", "EMA"], group="📊 Bollinger Bands Engine")
 bbStdDev     = input.float(2.0, "BB Standard Deviation", minval=0.001, step=0.1, group="📊 Bollinger Bands Engine")
 
+// --- Triple EMA Confluence Logic ---
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+ema100 = ta.ema(close, 100)
+
 // ==========================================
 // --- SECTION 3: GRAPHIC & STYLE SETTINGS ---
 // ==========================================
@@ -83,7 +88,6 @@ var float[] demandMinLow = array.new_float()
 var float[] supplyMaxHigh = array.new_float()
 var bool[] demandTouched = array.new_bool()
 var bool[] supplyTouched = array.new_bool()
-// NEW: Track precisely when the retest occurred
 var int[] demandTouchBar = array.new_int()
 var int[] supplyTouchBar = array.new_int()
 
@@ -207,8 +211,7 @@ if array.size(demandBoxes) > 0
                     dTouched := false
                     array.set(demandTouched, i, false)
 
-            // RETEST EXPIRY: If signal hasn't fired within 2 bars of the wick, clear the 'Touched' state
-            if dTouched and (bar_index - array.get(demandTouchBar, i) > 2)
+            if dTouched and array.size(demandTouchBar) > i and (bar_index - array.get(demandTouchBar, i) > 2)
                 dTouched := false
                 array.set(demandTouched, i, false)
 
@@ -231,8 +234,7 @@ if array.size(demandBoxes) > 0
             if currentState == 2 and dTouched
                 if (close > open) and (close > bTop)
                     array.set(demandState, i, 3), alertBuy := true
-                    float slP = low - (syminfo.mintick * tickBuffer)
-                    float tpP = high + (syminfo.mintick * tpBuffer)
+                    float slP = low - (syminfo.mintick * tickBuffer), float tpP = high + (syminfo.mintick * tpBuffer)
 
                     if useDynamicSL and not na(lastDemandBar)
                         int lb = bar_index - lastDemandBar
@@ -276,11 +278,14 @@ if array.size(demandBoxes) > 0
                                     lBB := true
                                 if high[j] >= upperBand[j] 
                                     uEx := true
-                        lStr = "BUY", lCol = #a0c4ff, emaUp = useBB and (bbBasis > bbBasis[1])
+
+                        // New Confluence Logic
+                        emaStackedBull = (ema20 > ema50) and (ema50 > ema100)
+                        lStr = "BUY", lCol = #a0c4ff
                         if useBB and not uEx
-                            if lBB and emaUp 
+                            if lBB and emaStackedBull
                                 lStr := "BUY A++", lCol := #0052cc
-                            else if lBB 
+                            else if emaStackedBull
                                 lStr := "BUY A+", lCol := #3a86ff
                         
                         array.set(demandTradeLabels, i, label.new(bar_index, low, text=lStr, style=label.style_triangleup, color=lCol, textcolor=lCol, size=size.small, yloc=yloc.belowbar, text_formatting=text.format_bold))
@@ -314,8 +319,7 @@ if array.size(supplyBoxes) > 0
                     sTouched := false
                     array.set(supplyTouched, i, false)
 
-            // RETEST EXPIRY: If signal hasn't fired within 2 bars of the wick, clear the 'Touched' state
-            if sTouched and (bar_index - array.get(supplyTouchBar, i) > 2)
+            if sTouched and array.size(supplyTouchBar) > i and (bar_index - array.get(supplyTouchBar, i) > 2)
                 sTouched := false
                 array.set(supplyTouched, i, false)
 
@@ -339,28 +343,6 @@ if array.size(supplyBoxes) > 0
                 if (close < open) and (close < bBot)
                     array.set(supplyState, i, 3), alertSell := true
                     float slP = high + (syminfo.mintick * tickBuffer), float tpP = low - (syminfo.mintick * tpBuffer)
-
-                    if useDynamicSL and not na(lastSupplyBar)
-                        int lb = bar_index - lastSupplyBar
-                        if lb > 2
-                            float sH = na
-                            for j = 1 to lb - 1
-                                if high[j] >= high[j+1] and high[j] >= high[j-1]
-                                    if na(sH) or high[j] > sH 
-                                        sH := high[j]
-                            if not na(sH) and sH > high 
-                                slP := sH + (syminfo.mintick * tickBuffer)
-
-                    if useDynamicTP and not na(lastSupplyBar)
-                        int tlb = bar_index - lastSupplyBar
-                        if tlb > 2
-                            float sLow = na
-                            for j = 1 to tlb - 1
-                                if low[j] <= low[j+1] and low[j] <= low[j-1]
-                                    if na(sLow) or low[j] < sLow 
-                                        sLow := low[j]
-                            if not na(sLow) and sLow < low 
-                                tpP := sLow - (syminfo.mintick * tpBuffer)
                     
                     if isBarClosed
                         strategy.entry("Short", strategy.short), strategy.exit("X Short", "Short", stop=slP, limit=tpP)
@@ -382,13 +364,16 @@ if array.size(supplyBoxes) > 0
                                     uBB := true
                                 if low[j] <= lowerBand[j] 
                                     lEx := true
-                        emaDown = useBB and (bbBasis < bbBasis[1]), lStr = "SELL", lCol = #ffb7b2
+
+                        // New Confluence Logic
+                        emaStackedBear = (ema20 < ema50) and (ema50 < ema100)
+                        lStr = "SELL", lCol = #ffb7b2
                         if useBB and not lEx
-                            if uBB and emaDown 
+                            if uBB and emaStackedBear
                                 lStr := "SELL A++", lCol := #9b0000
-                            else if uBB 
+                            else if emaStackedBear
                                 lStr := "SELL A+", lCol := #ff3333
-                        
+                                
                         array.set(supplyTradeLabels, i, label.new(bar_index, high, text=lStr, style=label.style_triangledown, color=lCol, textcolor=lCol, size=size.small, yloc=yloc.abovebar, text_formatting=text.format_bold))
                         array.set(supplyTouched, i, false)
             box.set_right(b, bar_index + offset)
