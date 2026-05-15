@@ -45,35 +45,37 @@ A zone enters State 1 immediately upon discovery and serves as the primary gatin
 
 ---
 
-### 🏹 State 2: Touch Detected (Retest Validation & Valid Wick Alerts)
+### 🏹 State 2: Touch Detected (Retest Validation & Early Warning)
 
-State 2 is achieved when the market pulls back into the active historical boundaries with specific rejection characteristics.
+State 2 is achieved when the market pulls back into the active historical boundaries with specific candlestick characteristics.
 
 #### A. RETEST Criteria Rules
 * **Correct Color Wick Requirement:**
     * **Demand Retest:** Strictly requires a **Bearish (Red)** candle wick to penetrate the zone boundaries.
     * **Supply Retest:** Strictly requires a **Bullish (Green)** candle wick to penetrate the zone boundaries.
 * **No-Body-Close Restriction:** If the retesting candle body closes **inside** the zone boundaries, the retest is disqualified. The zone remains on the chart and stays **Orange**, requiring a fresh, valid wick rejection to re-arm.
-* **Retest Expiry:** The signal gate remains open for only **2 bars** following a valid wick touch. If a reversal confirmation does not occur within this window, the retest expires to ensure signals only trigger on immediate rejections.
-* **Valid Wick Alerts:** The strategy issues a real-time notification upon the close of a valid wick retest (where the body remains outside). This serves as an early warning to prepare for a potential signal.
+* **Early Warning Alerts:** The strategy issues a real-time alert upon the close of a valid retest candle. This allows the user to prepare for a potential entry before the reversal signal is confirmed.
+* **Retest Expiry:** The signal gate remains open for **2 bars** following a valid wick touch. If a reversal confirmation does not occur within this window, the "Touched" state expires to ensure signals only trigger on immediate rejections.
 
 ---
 
 ### 🔒 State 3: Fired & Locked (Tiered Confluence Matrix)
 
-State 3 represents trade confirmation. The engine evaluates a tiered confluence scoring system based on market context and volatility.
+State 3 represents trade confirmation and execution. The engine evaluates market context via a triple EMA stack and volatility via Bollinger Bands.
+
+#### A. Signal Execution Gates
+* **Exit Confirmation:** A BUY or SELL signal fires only after a valid retest has occurred AND a subsequent reversal candle closes **completely outside** the zone boundaries.
+* **EMA Filter:** For A+ and A++ tiers, the signal candle **body** (both open and close) must be completely above (Demand) or below (Supply) all three EMAs (20, 50, 100) to confirm momentum and avoid trading into a reversal crossover.
+* **Signal Replacement logic:** If a zone is retested multiple times, the engine automatically deletes the previous signal objects (Labels, SL/TP lines) and anchors the new signal to the most recent valid retest candle.
 
 | Signal Tier | Requirements | Visual Style |
 | :--- | :--- | :--- |
-| **A++ (Elite Momentum)** | **Triple EMA Stacked** (20>50>100 for Buys) **AND** **Bollinger Band** Touch/Pierce | Solid Vivid Hue |
-| **A+ (Market Context)** | **Triple EMA Stacked** (Correct order for trade direction) | Intermediate Shade |
-| **Standard** | Core Retest Engine fired without trend alignment or volatility rejection | Lighter Shade |
-
-#### A. Signal Execution & Replacement
-* **Exit Confirmation:** A BUY or SELL signal fires only after a valid retest has occurred AND a subsequent reversal candle (Green for BUY, Red for SELL) closes **completely outside** the zone boundaries.
-* **Signal Replacement:** If a zone is retested multiple times, the engine automatically deletes previous signal objects (Labels, SL/TP lines) and anchors the new signal to the most recent valid rejection.
+| **A++ (Elite Momentum)** | **A+ Requirements** met **AND** **Bollinger Band** touch/pierce detected during retest | Solid Vivid Hue |
+| **A+ (Market Context)** | **Triple EMA Stacked** (20>50>100 for Buys) **AND** candle body clear of EMAs | Intermediate Shade |
+| **Standard** | Core Retest Engine fired without fulfilling trend alignment or volatility rejection | Lighter Shade |
 
 #### B. Execution & Graphic Output
+* **Real-Time Visuals:** The strategy uses `calc_on_every_tick=true` for real-time EMA and Bollinger Band tracking.
 * **Dynamic Risk Anchoring:** * **Stop Loss (SL):** Calculated relative to the **Signal Candle Low** (Demand) or **High** (Supply) plus the `tickBuffer`.
     * **Take Profit (TP):** Calculated relative to the **Signal Candle High** (Demand) or **Low** (Supply) plus the `tpBuffer`.
 * **Visual Transitions:** Zone borders remain **Orange** during the retest phase and only transition to **Green** (Demand) or **Red** (Supply) once an entry signal is officially confirmed.
@@ -85,7 +87,7 @@ State 3 represents trade confirmation. The engine evaluates a tiered confluence 
 Active zones are evaluated on every bar close. If a zone violates baseline parameters, it is subjected to an immediate Dynamic Garbage Collection Routine.
 
 ### Invalidation Triggers
-* **Hard Breach:** A candle body explicitly closes beyond the defensive outer wall line of the zone (`close < bBot` for Demand; `close > bTop` for Supply).
+* **Hard Breach:** A candle body explicitly closes beyond the defensive outer wall line of the zone.
 * **Proximity Limit Breach:** The current market price drifts too far away, exceeding the `proximityPct` threshold.
 
 ---
@@ -97,8 +99,8 @@ Active zones are evaluated on every bar close. If a zone violates baseline param
 | `demandBoxes` / `supplyBoxes` | Visual zone block coordinates rendering |
 | `demandTradeLabels` / `supplyTradeLabels` | Tiered execution indicators (A++, A+, BUY/SELL) |
 | `demandState` / `supplyState` | Controls the sequential signal engine gates |
-| `demandSLLines` / `supplySLLines` | Signal-anchored Stop Loss markers |
-| `demandTPLines` / `supplyTPLines` | Signal-anchored Take Profit markers |
+| `demandSLLines` / `supplySLLines` | Signal-anchored Stop Loss markers (updated to most recent retest) |
+| `demandTPLines` / `supplyTPLines` | Signal-anchored Take Profit markers (updated to most recent retest) |
 
 ---
 

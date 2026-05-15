@@ -211,6 +211,7 @@ if array.size(demandBoxes) > 0
                     dTouched := false
                     array.set(demandTouched, i, false)
 
+            // RETEST EXPIRY: Signal gate reverted back to 2 bars (diff > 2 triggers expiry)
             if dTouched and array.size(demandTouchBar) > i and (bar_index - array.get(demandTouchBar, i) > 2)
                 dTouched := false
                 array.set(demandTouched, i, false)
@@ -232,6 +233,8 @@ if array.size(demandBoxes) > 0
             array.remove(demandSLLines, i), array.remove(demandTPLines, i), array.remove(demandTouchBar, i)
         else
             if currentState == 2 and dTouched
+                // Body Filter: Entire signal candle body must be above all 3 EMAs
+                bool bodyAboveEMAs = math.min(open, close) > ema20 and math.min(open, close) > ema50 and math.min(open, close) > ema100
                 if (close > open) and (close > bTop)
                     array.set(demandState, i, 3), alertBuy := true
                     float slP = low - (syminfo.mintick * tickBuffer), float tpP = high + (syminfo.mintick * tpBuffer)
@@ -279,11 +282,11 @@ if array.size(demandBoxes) > 0
                                 if high[j] >= upperBand[j] 
                                     uEx := true
 
-                        // New Confluence Logic
+                        // New Confluence Logic with Body/EMA Filter
                         emaStackedBull = (ema20 > ema50) and (ema50 > ema100)
                         lStr = "BUY", lCol = #a0c4ff
-                        if useBB and not uEx
-                            if lBB and emaStackedBull
+                        if bodyAboveEMAs
+                            if useBB and not uEx and lBB and emaStackedBull
                                 lStr := "BUY A++", lCol := #0052cc
                             else if emaStackedBull
                                 lStr := "BUY A+", lCol := #3a86ff
@@ -319,6 +322,7 @@ if array.size(supplyBoxes) > 0
                     sTouched := false
                     array.set(supplyTouched, i, false)
 
+            // RETEST EXPIRY: Signal gate reverted back to 2 bars (diff > 2 triggers expiry)
             if sTouched and array.size(supplyTouchBar) > i and (bar_index - array.get(supplyTouchBar, i) > 2)
                 sTouched := false
                 array.set(supplyTouched, i, false)
@@ -340,6 +344,8 @@ if array.size(supplyBoxes) > 0
             array.remove(supplySLLines, i), array.remove(supplyTPLines, i), array.remove(supplyTouchBar, i)
         else
             if currentState == 2 and sTouched
+                // Body Filter: Entire signal candle body must be below all 3 EMAs
+                bool bodyBelowEMAs = math.max(open, close) < ema20 and math.max(open, close) < ema50 and math.max(open, close) < ema100
                 if (close < open) and (close < bBot)
                     array.set(supplyState, i, 3), alertSell := true
                     float slP = high + (syminfo.mintick * tickBuffer), float tpP = low - (syminfo.mintick * tpBuffer)
@@ -365,11 +371,11 @@ if array.size(supplyBoxes) > 0
                                 if low[j] <= lowerBand[j] 
                                     lEx := true
 
-                        // New Confluence Logic
+                        // New Confluence Logic with Body/EMA Filter
                         emaStackedBear = (ema20 < ema50) and (ema50 < ema100)
                         lStr = "SELL", lCol = #ffb7b2
-                        if useBB and not lEx
-                            if uBB and emaStackedBear
+                        if bodyBelowEMAs
+                            if useBB and not lEx and uBB and emaStackedBear
                                 lStr := "SELL A++", lCol := #9b0000
                             else if emaStackedBear
                                 lStr := "SELL A+", lCol := #ff3333
